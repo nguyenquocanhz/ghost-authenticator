@@ -1,0 +1,17 @@
+# Compilation outputs
+bin/
+obj/
+*.user
+*.userosscache
+*.sln.docstates
+
+# Security & Data files
+*.dat
+*.json
+!appsettings.json
+!*.csproj
+
+# IDE config files
+.vs/
+.idea/
+.vscode/

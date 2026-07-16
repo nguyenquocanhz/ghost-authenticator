@@ -1,0 +1,8 @@
+<Application x:Class="AuthenticatorDesktop.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+         <!-- Global styling or colors if needed -->
+    </Application.Resources>
+</Application>
