@@ -264,6 +264,10 @@
                                 <Button Background="Transparent" BorderThickness="0" Margin="0,0,8,0" Click="BtnCopyRow_Click" Tag="{Binding}" Width="30" Height="30" ToolTip="Sao chép OTP">
                                     <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="{DynamicResource TextSecondary}"/>
                                 </Button>
+                                <!-- View Secret Button -->
+                                <Button Background="Transparent" BorderThickness="0" Margin="0,0,8,0" Click="BtnViewSecret_Click" Tag="{Binding}" Width="30" Height="30" ToolTip="Xem Khóa Bí Mật (Secret Key)">
+                                    <TextBlock Text="&#xE7B3;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="{DynamicResource TextSecondary}"/>
+                                </Button>
                                 <!-- Delete Button -->
                                 <Button Background="Transparent" BorderThickness="0" Click="BtnDeleteRow_Click" Tag="{Binding}" Width="30" Height="30" ToolTip="Xóa tài khoản">
                                     <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="{DynamicResource DangerRed}"/>
@@ -379,7 +383,6 @@
                         <RowDefinition Height="Auto"/> <!-- Tab Headers -->
                         <RowDefinition Height="*"/>    <!-- Tab Content -->
                     </Grid.RowDefinitions>
-
                     <!-- Header -->
                     <Grid Grid.Row="0" Margin="0,0,0,16">
                         <TextBlock Text="Sao lưu &amp; Nhập dữ liệu hàng loạt" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
@@ -389,10 +392,11 @@
                     </Grid>
 
                     <!-- Tab Buttons -->
-                    <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,0,18">
+                    <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,18">
                         <Button x:Name="BtnTabJson" Content="Sao lưu JSON" Padding="8,6" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="{DynamicResource PrimaryBlue}" Foreground="{DynamicResource TextPrimary}" FontWeight="SemiBold" Click="BtnTab_Click" Tag="JSON"/>
                         <Button x:Name="BtnTabCsv" Content="Nhập CSV/TXT" Padding="8,6" Background="Transparent" BorderThickness="0" BorderBrush="Transparent" Foreground="{DynamicResource TextSecondary}" Click="BtnTab_Click" Tag="CSV"/>
                         <Button x:Name="BtnTabSheet" Content="Google Sheet" Padding="8,6" Background="Transparent" BorderThickness="0" BorderBrush="Transparent" Foreground="{DynamicResource TextSecondary}" Click="BtnTab_Click" Tag="SHEET"/>
+                        <Button x:Name="BtnTabTrash" Content="Thùng rác" Padding="8,6" Background="Transparent" BorderThickness="0" BorderBrush="Transparent" Foreground="{DynamicResource TextSecondary}" Click="BtnTab_Click" Tag="TRASH"/>
                     </UniformGrid>
 
                     <!-- Tab Content Panel -->
@@ -465,6 +469,75 @@
                                 </Button.Resources>
                             </Button>
                         </StackPanel>
+
+                        <!-- Tab 4: Trash Recycle Bin -->
+                        <Grid x:Name="PanelTabTrash" Visibility="Collapsed" Margin="0,0,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <TextBlock Grid.Row="0" Text="Khôi phục tài khoản đã xóa" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                            
+                            <ListBox Grid.Row="1" x:Name="TrashList" Height="140" Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ScrollViewer.VerticalScrollBarVisibility="Auto" Margin="0,0,0,10">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="BorderThickness" Value="0"/>
+                                        <Setter Property="Padding" Value="4"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter/>
+                                                    </Border>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Width="410">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Issuer}" FontSize="13" FontWeight="Medium" Foreground="{DynamicResource TextPrimary}"/>
+                                                <TextBlock Text="{Binding Label}" FontSize="11" Foreground="{DynamicResource TextSecondary}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <!-- Restore Button -->
+                                                <Button Background="Transparent" BorderThickness="0" Click="BtnRestoreTrash_Click" Tag="{Binding}" Width="28" Height="28" Margin="0,0,6,0" ToolTip="Khôi phục tài khoản">
+                                                    <TextBlock Text="&#xE7A7;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{DynamicResource PrimaryBlue}"/>
+                                                </Button>
+                                                <!-- Permanently Delete Button -->
+                                                <Button Background="Transparent" BorderThickness="0" Click="BtnDeleteTrashPermanent_Click" Tag="{Binding}" Width="28" Height="28" ToolTip="Xóa vĩnh viễn">
+                                                    <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{DynamicResource DangerRed}"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            
+                            <Grid Grid.Row="2" Margin="0,2,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="* Các tài khoản đã xóa có thể được khôi phục tại đây." FontSize="11" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="Dọn thùng rác" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Foreground="{DynamicResource DangerRed}" Padding="10,6" FontSize="11" Click="BtnEmptyTrash_Click">
+                                    <Button.Resources>
+                                        <Style TargetType="{x:Type Border}">
+                                            <Setter Property="CornerRadius" Value="6"/>
+                                        </Style>
+                                    </Button.Resources>
+                                </Button>
+                            </Grid>
+                        </Grid>
                     </Grid>
                 </Grid>
             </Border>

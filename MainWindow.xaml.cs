@@ -20,12 +20,15 @@ namespace AuthenticatorDesktop
     {
         private const string DataFileName = "accounts.dat";
         private const string SecurityFileName = "security.dat";
+        private const string DeletedFileName = "deleted_accounts.dat";
         private readonly string _dataPath;
         private readonly string _securityPath;
         private readonly string _biometricPath;
+        private readonly string _deletedPath;
         private readonly DispatcherTimer _timer;
         private bool _isDarkMode = false;
         private List<Account> _allAccounts = new();
+        private List<Account> _deletedAccounts = new();
         private byte[]? _derivedKey;
         public ObservableCollection<Account> DisplayAccounts { get; } = new();
 
@@ -35,6 +38,7 @@ namespace AuthenticatorDesktop
             _dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DataFileName);
             _securityPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, SecurityFileName);
             _biometricPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "biometric.dat");
+            _deletedPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DeletedFileName);
             
             AccountsList.ItemsSource = DisplayAccounts;
             
@@ -363,11 +367,28 @@ namespace AuthenticatorDesktop
                 string json = Encoding.UTF8.GetString(decryptedBytes);
                 
                 _allAccounts = JsonSerializer.Deserialize<List<Account>>(json) ?? new List<Account>();
+
+                // Load deleted accounts
+                if (File.Exists(_deletedPath))
+                {
+                    byte[] encDeleted = File.ReadAllBytes(_deletedPath);
+                    if (encDeleted.Length > 0)
+                    {
+                        byte[] decDeleted = Crypto.Decrypt(encDeleted, _derivedKey);
+                        string delJson = Encoding.UTF8.GetString(decDeleted);
+                        _deletedAccounts = JsonSerializer.Deserialize<List<Account>>(delJson) ?? new List<Account>();
+                    }
+                }
+                else
+                {
+                    _deletedAccounts = new List<Account>();
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Không thể giải mã cơ sở dữ liệu.\nChi tiết: " + ex.Message, "Lỗi giải mã", MessageBoxButton.OK, MessageBoxImage.Warning);
                 _allAccounts = new List<Account>();
+                _deletedAccounts = new List<Account>();
             }
             
             UpdateUIList();
@@ -389,6 +410,25 @@ namespace AuthenticatorDesktop
             catch (Exception ex)
             {
                 MessageBox.Show("Không thể mã hóa cơ sở dữ liệu.\nLỗi: " + ex.Message, "Lỗi lưu trữ", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void SaveDeletedAccounts()
+        {
+            try
+            {
+                if (_derivedKey == null) return;
+
+                string json = JsonSerializer.Serialize(_deletedAccounts);
+                byte[] rawBytes = Encoding.UTF8.GetBytes(json);
+
+                // Encrypt using AES-256 with derived key
+                byte[] encryptedBytes = Crypto.Encrypt(rawBytes, _derivedKey);
+                File.WriteAllBytes(_deletedPath, encryptedBytes);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Không thể mã hóa danh sách đã xóa.\nLỗi: " + ex.Message, "Lỗi lưu trữ", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -546,14 +586,52 @@ namespace AuthenticatorDesktop
         {
             if (sender is Button btn && btn.Tag is Account acc)
             {
-                var result = MessageBox.Show($"Bạn có chắc chắn muốn xóa tài khoản \"{acc.Issuer} ({acc.Label})\" không?", 
+                var result = MessageBox.Show($"Bạn có chắc chắn muốn xóa tài khoản \"{acc.Issuer} ({acc.Label})\" không?\nTài khoản bị xóa sẽ được đưa vào Thùng rác và có thể khôi phục bất cứ lúc nào.", 
                     "Xác nhận xóa", MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 
                 if (result == MessageBoxResult.Yes)
                 {
                     _allAccounts.Remove(acc);
                     SaveAccounts();
+
+                    _deletedAccounts.Add(acc);
+                    SaveDeletedAccounts();
+
                     UpdateUIList();
+                    MessageBox.Show($"Đã chuyển tài khoản \"{acc.Issuer}\" vào Thùng rác. Bạn có thể khôi phục trong phần Sao lưu & Nhập liệu.", "Xóa thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+        }
+
+        private async void BtnViewSecret_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is Account acc)
+            {
+                try
+                {
+                    if (File.Exists(_biometricPath))
+                    {
+                        var availability = await Windows.Security.Credentials.UI.UserConsentVerifier.CheckAvailabilityAsync();
+                        if (availability == Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
+                        {
+                            var result = await Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync($"Xác thực danh tính để xem khóa bí mật của {acc.Issuer}.");
+                            if (result != Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
+                            {
+                                return;
+                            }
+                        }
+                    }
+
+                    var msgBoxResult = MessageBox.Show($"Khóa bí mật của tài khoản \"{acc.Issuer} ({acc.Label})\" là:\n\n{acc.Secret}\n\nBạn có muốn sao chép khóa này vào bộ nhớ đệm không?", "Xem khóa bí mật", MessageBoxButton.YesNo, MessageBoxImage.Information);
+                    if (msgBoxResult == MessageBoxResult.Yes)
+                    {
+                        Clipboard.SetText(acc.Secret);
+                        MessageBox.Show("Đã sao chép khóa bí mật vào clipboard!", "Sao chép thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Có lỗi xảy ra: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -637,10 +715,15 @@ namespace AuthenticatorDesktop
             BtnTabSheet.Foreground = (SolidColorBrush)Resources["TextSecondary"];
             BtnTabSheet.FontWeight = FontWeights.Normal;
 
+            BtnTabTrash.BorderBrush = Brushes.Transparent;
+            BtnTabTrash.Foreground = (SolidColorBrush)Resources["TextSecondary"];
+            BtnTabTrash.FontWeight = FontWeights.Normal;
+
             // Hide panels
             PanelTabJson.Visibility = Visibility.Collapsed;
             PanelTabCsv.Visibility = Visibility.Collapsed;
             PanelTabSheet.Visibility = Visibility.Collapsed;
+            PanelTabTrash.Visibility = Visibility.Collapsed;
 
             // Show selected panel
             if (tabName == "JSON")
@@ -663,6 +746,82 @@ namespace AuthenticatorDesktop
                 BtnTabSheet.Foreground = (SolidColorBrush)Resources["TextPrimary"];
                 BtnTabSheet.FontWeight = FontWeights.SemiBold;
                 PanelTabSheet.Visibility = Visibility.Visible;
+            }
+            else if (tabName == "TRASH")
+            {
+                BtnTabTrash.BorderBrush = (SolidColorBrush)Resources["PrimaryBlue"];
+                BtnTabTrash.Foreground = (SolidColorBrush)Resources["TextPrimary"];
+                BtnTabTrash.FontWeight = FontWeights.SemiBold;
+                PanelTabTrash.Visibility = Visibility.Visible;
+                
+                TrashList.ItemsSource = null;
+                TrashList.ItemsSource = _deletedAccounts;
+            }
+        }
+
+        private void BtnRestoreTrash_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is Account acc)
+            {
+                _deletedAccounts.Remove(acc);
+                SaveDeletedAccounts();
+
+                _allAccounts.Add(acc);
+                SaveAccounts();
+
+                UpdateUIList();
+                UpdatePins();
+
+                // Refresh ListBox
+                TrashList.ItemsSource = null;
+                TrashList.ItemsSource = _deletedAccounts;
+
+                MessageBox.Show($"Đã khôi phục tài khoản \"{acc.Issuer}\" thành công!", "Khôi phục thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void BtnDeleteTrashPermanent_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.Tag is Account acc)
+            {
+                var result = MessageBox.Show($"Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản \"{acc.Issuer} ({acc.Label})\" không?\nHành động này không thể hoàn tác!", 
+                    "Xác nhận xóa vĩnh viễn", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                
+                if (result == MessageBoxResult.Yes)
+                {
+                    _deletedAccounts.Remove(acc);
+                    SaveDeletedAccounts();
+
+                    // Refresh ListBox
+                    TrashList.ItemsSource = null;
+                    TrashList.ItemsSource = _deletedAccounts;
+
+                    MessageBox.Show("Đã xóa tài khoản vĩnh viễn.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+            }
+        }
+
+        private void BtnEmptyTrash_Click(object sender, RoutedEventArgs e)
+        {
+            if (_deletedAccounts.Count == 0)
+            {
+                MessageBox.Show("Thùng rác hiện đang trống.", "Thùng rác trống", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var result = MessageBox.Show("Bạn có chắc chắn muốn xóa vĩnh viễn toàn bộ tài khoản trong Thùng rác không?\nHành động này không thể hoàn tác!", 
+                "Dọn sạch thùng rác", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+            
+            if (result == MessageBoxResult.Yes)
+            {
+                _deletedAccounts.Clear();
+                SaveDeletedAccounts();
+
+                // Refresh ListBox
+                TrashList.ItemsSource = null;
+                TrashList.ItemsSource = _deletedAccounts;
+
+                MessageBox.Show("Thùng rác đã được dọn sạch.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
 
