@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -24,6 +24,13 @@
 
   <ItemGroup>
     <Resource Include="asset\93cca52a-7f6f-40dd-8dba-7ba23fdcd6dc.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="installer\**" />
+    <Page Remove="installer\**" />
+    <Resource Remove="installer\**" />
+    <None Include="installer\**" />
   </ItemGroup>
 
 </Project>

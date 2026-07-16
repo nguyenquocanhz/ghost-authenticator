@@ -22,6 +22,7 @@ namespace AuthenticatorDesktop
         private const string SecurityFileName = "security.dat";
         private readonly string _dataPath;
         private readonly string _securityPath;
+        private readonly string _biometricPath;
         private readonly DispatcherTimer _timer;
         private bool _isDarkMode = false;
         private List<Account> _allAccounts = new();
@@ -33,6 +34,7 @@ namespace AuthenticatorDesktop
             InitializeComponent();
             _dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DataFileName);
             _securityPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, SecurityFileName);
+            _biometricPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "biometric.dat");
             
             AccountsList.ItemsSource = DisplayAccounts;
             
@@ -58,6 +60,15 @@ namespace AuthenticatorDesktop
                 {
                     TxtMasterPassword.Focus();
                 }));
+
+                // Check if Windows Hello is set up
+                if (File.Exists(_biometricPath))
+                {
+                    BtnHelloUnlock.Visibility = Visibility.Visible;
+                    ChkWindowsHello.IsChecked = true;
+                    // Auto trigger Windows Hello unlock on startup
+                    Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(TriggerWindowsHelloUnlock));
+                }
             }
 
             // Set up timer (ticks every second to update pins and progress bar)
@@ -850,6 +861,96 @@ namespace AuthenticatorDesktop
                 Secret = secret
             });
             return true;
+        }
+
+        // ==================== BIOMETRIC UNLOCK (WINDOWS HELLO) ====================
+
+        private void BtnHelloUnlock_Click(object sender, RoutedEventArgs e)
+        {
+            TriggerWindowsHelloUnlock();
+        }
+
+        private async void TriggerWindowsHelloUnlock()
+        {
+            if (!File.Exists(_biometricPath)) return;
+
+            try
+            {
+                var availability = await Windows.Security.Credentials.UI.UserConsentVerifier.CheckAvailabilityAsync();
+                if (availability != Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
+                {
+                    MessageBox.Show("Tính năng Windows Hello hiện không khả dụng trên thiết bị này.", "Xác thực thất bại", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var result = await Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync("Xác thực nhận diện khuôn mặt hoặc vân tay để mở khóa tài khoản Ghost Authenticator.");
+                if (result == Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
+                {
+                    byte[] encryptedKey = File.ReadAllBytes(_biometricPath);
+                    byte[] key = ProtectedData.Unprotect(encryptedKey, null, DataProtectionScope.CurrentUser);
+
+                    _derivedKey = key;
+
+                    // Open App
+                    AuthGrid.Visibility = Visibility.Collapsed;
+                    MainAppGrid.Visibility = Visibility.Visible;
+
+                    LoadAccounts();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Có lỗi xảy ra khi xác thực bằng Windows Hello:\n" + ex.Message, "Lỗi xác thực", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void ChkWindowsHello_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_derivedKey == null) return;
+
+            try
+            {
+                var availability = await Windows.Security.Credentials.UI.UserConsentVerifier.CheckAvailabilityAsync();
+                if (availability != Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
+                {
+                    MessageBox.Show("Thiết bị của bạn không hỗ trợ hoặc chưa cấu hình Windows Hello (FaceID / Vân tay / PIN).\nVui lòng bật Windows Hello trong Windows Settings.", "Không hỗ trợ", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ChkWindowsHello.IsChecked = false;
+                    return;
+                }
+
+                // Verify user consent first to confirm setup
+                var result = await Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync("Xác nhận danh tính để kích hoạt mở khóa bằng Windows Hello.");
+                if (result == Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
+                {
+                    // Encrypt derived AES key using DPAPI
+                    byte[] encryptedKey = ProtectedData.Protect(_derivedKey, null, DataProtectionScope.CurrentUser);
+                    File.WriteAllBytes(_biometricPath, encryptedKey);
+
+                    BtnHelloUnlock.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    ChkWindowsHello.IsChecked = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Lỗi thiết lập Windows Hello: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                ChkWindowsHello.IsChecked = false;
+            }
+        }
+
+        private void ChkWindowsHello_Unchecked(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (File.Exists(_biometricPath))
+                {
+                    File.Delete(_biometricPath);
+                }
+                BtnHelloUnlock.Visibility = Visibility.Collapsed;
+            }
+            catch { /* Ignore delete errors */ }
         }
     }
 
