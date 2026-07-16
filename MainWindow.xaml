@@ -89,7 +89,7 @@
 
                     <!-- Password Input -->
                     <TextBlock Text="Mật khẩu chính (Master Password)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
-                    <PasswordBox x:Name="TxtMasterPassword" PasswordChar="●" Padding="10,8" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource InputBg}" Foreground="{DynamicResource TextPrimary}" BorderThickness="1" KeyDown="TxtMasterPassword_KeyDown" Margin="0,0,20,0"/>
+                    <PasswordBox x:Name="TxtMasterPassword" PasswordChar="●" Padding="10,8" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource InputBg}" Foreground="{DynamicResource TextPrimary}" BorderThickness="1" KeyDown="TxtMasterPassword_KeyDown" Margin="0,0,0,20"/>
 
                     <Button Content="Mở khóa" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="14,10" FontWeight="Medium" FontSize="14" Click="BtnUnlock_Click">
                         <Button.Resources>
