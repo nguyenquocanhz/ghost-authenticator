@@ -158,6 +158,84 @@ namespace AuthenticatorDesktop
             }
         }
 
+        private void TxtNewPassword_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                TxtConfirmPassword.Focus();
+            }
+        }
+
+        private void TxtConfirmPassword_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                BtnSetupPassword_Click(this, new RoutedEventArgs());
+            }
+        }
+
+        protected override void OnKeyDown(KeyEventArgs e)
+        {
+            base.OnKeyDown(e);
+
+            // Esc to close modals
+            if (e.Key == Key.Escape)
+            {
+                if (AddModal.Visibility == Visibility.Visible)
+                {
+                    AddModal.Visibility = Visibility.Collapsed;
+                    e.Handled = true;
+                }
+                else if (AboutModal.Visibility == Visibility.Visible)
+                {
+                    AboutModal.Visibility = Visibility.Collapsed;
+                    e.Handled = true;
+                }
+                else if (BackupImportModal.Visibility == Visibility.Visible)
+                {
+                    BackupImportModal.Visibility = Visibility.Collapsed;
+                    e.Handled = true;
+                }
+            }
+
+            // Ctrl shortcuts
+            if (Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                if (e.Key == Key.F || e.Key == Key.S)
+                {
+                    SearchBox.Focus();
+                    SearchBox.SelectAll();
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.N)
+                {
+                    if (MainAppGrid.Visibility == Visibility.Visible)
+                    {
+                        BtnAdd_Click(this, new RoutedEventArgs());
+                        e.Handled = true;
+                    }
+                }
+                else if (e.Key == Key.C)
+                {
+                    if (AccountsList.SelectedItem is Account selected)
+                    {
+                        CopyOtpToClipboard(selected.Secret);
+                        e.Handled = true;
+                    }
+                }
+            }
+
+            // Enter key on selected row in accounts list
+            if (e.Key == Key.Enter && AccountsList.IsFocused)
+            {
+                if (AccountsList.SelectedItem is Account selected)
+                {
+                    CopyOtpToClipboard(selected.Secret);
+                    e.Handled = true;
+                }
+            }
+        }
+
         private void UnlockApplication()
         {
             string password = TxtMasterPassword.Password;

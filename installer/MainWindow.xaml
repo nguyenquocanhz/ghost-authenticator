@@ -183,7 +183,7 @@
                 <!-- Next / Cancel Buttons -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button x:Name="BtnCancel" Content="Hủy bỏ" Margin="0,0,10,0" Click="BtnCancel_Click"/>
-                    <Button x:Name="BtnNext" Content="Tiếp tục" Style="{StaticResource BtnPrimary}" Click="BtnNext_Click"/>
+                    <Button x:Name="BtnNext" Content="Tiếp tục" IsDefault="True" Style="{StaticResource BtnPrimary}" Click="BtnNext_Click"/>
                 </StackPanel>
             </Grid>
         </Border>
