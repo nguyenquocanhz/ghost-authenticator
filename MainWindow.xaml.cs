@@ -45,8 +45,9 @@ namespace AuthenticatorDesktop
             // Check if Master Password has been initialized
             if (!File.Exists(_securityPath))
             {
-                // First run: show Setup Password
-                SetupPasswordPanel.Visibility = Visibility.Visible;
+                // First run: show Welcome Choice Panel (Create New vs Restore Backup)
+                WelcomeChoicePanel.Visibility = Visibility.Visible;
+                SetupPasswordPanel.Visibility = Visibility.Collapsed;
                 UnlockPanel.Visibility = Visibility.Collapsed;
                 AuthGrid.Visibility = Visibility.Visible;
                 MainAppGrid.Visibility = Visibility.Collapsed;
@@ -88,7 +89,150 @@ namespace AuthenticatorDesktop
             UpdateProgressBar();
         }
 
-        // ==================== MASTER PASSWORD FLOW ====================
+        // ==================== ONBOARDING & MASTER PASSWORD FLOW ====================
+
+        private void BtnChoiceCreateNew_Click(object sender, RoutedEventArgs e)
+        {
+            WelcomeChoicePanel.Visibility = Visibility.Collapsed;
+            SetupPasswordPanel.Visibility = Visibility.Visible;
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+            {
+                TxtNewPassword.Focus();
+            }));
+        }
+
+        private void BtnChoiceRestore_Click(object sender, RoutedEventArgs e)
+        {
+            var ofd = new OpenFileDialog
+            {
+                Title = "Chọn file sao lưu để khôi phục (Encrypted .ghostbak, JSON hoặc CSV)",
+                Filter = "Tệp sao lưu 2FA (*.ghostbak;*.json;*.csv;*.txt)|*.ghostbak;*.json;*.csv;*.txt|GhostBak Encrypted (*.ghostbak)|*.ghostbak|JSON Backup (*.json)|*.json|CSV/TXT (*.csv;*.txt)|*.csv;*.txt"
+            };
+
+            if (ofd.ShowDialog() == true)
+            {
+                string ext = Path.GetExtension(ofd.FileName).ToLower();
+
+                if (ext == ".ghostbak")
+                {
+                    string password = Microsoft.VisualBasic.Interaction.InputBox(
+                        "Nhập mật khẩu đã dùng để bảo vệ file sao lưu .ghostbak này:\n(Mật khẩu này cũng sẽ được thiết lập làm Mật Khẩu Chính cho ứng dụng)",
+                        "Khôi Phục Bản Sao Lưu Encrypted .ghostbak",
+                        "");
+
+                    if (string.IsNullOrWhiteSpace(password))
+                    {
+                        MessageBox.Show("Vui lòng nhập mật khẩu để giải mã file sao lưu.", "Hủy khôi phục", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    try
+                    {
+                        byte[] encryptedBytes = File.ReadAllBytes(ofd.FileName);
+                        string json = Crypto.DecryptGhostBak(encryptedBytes, password);
+                        var imported = JsonSerializer.Deserialize<List<Account>>(json);
+                        if (imported == null || imported.Count == 0)
+                        {
+                            MessageBox.Show("File sao lưu không chứa tài khoản hợp lệ nào.", "Lỗi dữ liệu", MessageBoxButton.OK, MessageBoxImage.Error);
+                            return;
+                        }
+
+                        // Initialize security vault with this password
+                        byte[] salt = Crypto.GenerateRandomBytes(16);
+                        byte[] key = Crypto.DeriveKey(password, salt);
+                        byte[] plainToken = Encoding.UTF8.GetBytes("AUTH-OK");
+                        byte[] cipherToken = Crypto.Encrypt(plainToken, key);
+                        byte[] securityData = new byte[salt.Length + cipherToken.Length];
+                        Array.Copy(salt, 0, securityData, 0, salt.Length);
+                        Array.Copy(cipherToken, 0, securityData, salt.Length, cipherToken.Length);
+                        File.WriteAllBytes(_securityPath, securityData);
+
+                        _derivedKey = key;
+                        _allAccounts = imported;
+                        SaveAccounts();
+
+                        // Open App
+                        WelcomeChoicePanel.Visibility = Visibility.Collapsed;
+                        AuthGrid.Visibility = Visibility.Collapsed;
+                        MainAppGrid.Visibility = Visibility.Visible;
+                        UpdateUIList();
+                        UpdatePins();
+
+                        MessageBox.Show($"Khôi phục thành công {imported.Count} tài khoản từ bản sao lưu .ghostbak!\nMật khẩu chính của ứng dụng đã được thiết lập theo mật khẩu file sao lưu.", "Khôi phục hoàn tất", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Giải mã file sao lưu thất bại. Mật khẩu không đúng hoặc file bị hư hỏng.\nChi tiết: " + ex.Message, "Lỗi giải mã", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+                else
+                {
+                    // JSON or CSV File
+                    string password = Microsoft.VisualBasic.Interaction.InputBox(
+                        "Tệp sao lưu này là bản rõ (JSON/CSV). Vui lòng đặt Mật Khẩu Chính (Master Password) mới để bảo vệ ứng dụng:",
+                        "Thiết Lập Mật Khẩu Chính Khôi Phục",
+                        "");
+
+                    if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+                    {
+                        MessageBox.Show("Mật khẩu chính phải có tối thiểu 8 ký tự.", "Mật khẩu không hợp lệ", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    try
+                    {
+                        string fileContent = File.ReadAllText(ofd.FileName);
+                        List<Account> importedAccounts = new();
+
+                        if (ext == ".json")
+                        {
+                            var parsed = JsonSerializer.Deserialize<List<Account>>(fileContent);
+                            if (parsed != null) importedAccounts = parsed;
+                        }
+                        else
+                        {
+                            // CSV/TXT Parsing
+                            _allAccounts = new List<Account>();
+                            ImportFromCsvText(fileContent);
+                            importedAccounts = new List<Account>(_allAccounts);
+                        }
+
+                        if (importedAccounts.Count == 0)
+                        {
+                            MessageBox.Show("Không tìm thấy dữ liệu tài khoản 2FA hợp lệ nào trong tệp tin.", "Lỗi dữ liệu", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            return;
+                        }
+
+                        // Initialize security vault with this password
+                        byte[] salt = Crypto.GenerateRandomBytes(16);
+                        byte[] key = Crypto.DeriveKey(password, salt);
+                        byte[] plainToken = Encoding.UTF8.GetBytes("AUTH-OK");
+                        byte[] cipherToken = Crypto.Encrypt(plainToken, key);
+                        byte[] securityData = new byte[salt.Length + cipherToken.Length];
+                        Array.Copy(salt, 0, securityData, 0, salt.Length);
+                        Array.Copy(cipherToken, 0, securityData, salt.Length, cipherToken.Length);
+                        File.WriteAllBytes(_securityPath, securityData);
+
+                        _derivedKey = key;
+                        _allAccounts = importedAccounts;
+                        SaveAccounts();
+
+                        // Open App
+                        WelcomeChoicePanel.Visibility = Visibility.Collapsed;
+                        AuthGrid.Visibility = Visibility.Collapsed;
+                        MainAppGrid.Visibility = Visibility.Visible;
+                        UpdateUIList();
+                        UpdatePins();
+
+                        MessageBox.Show($"Khôi phục thành công {importedAccounts.Count} tài khoản 2FA và khởi tạo kho bảo mật thành công!", "Khôi phục hoàn tất", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show("Đọc file sao lưu thất bại: " + ex.Message, "Lỗi đọc tệp", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                }
+            }
+        }
 
         private void BtnSetupPassword_Click(object sender, RoutedEventArgs e)
         {
@@ -674,12 +818,12 @@ namespace AuthenticatorDesktop
             }
         }
 
-        // ==================== BACKUP & BULK IMPORT ====================
+        // ==================== BACKUP & BULK IMPORT & QR SCANNER ====================
 
         private void BtnBackup_Click(object sender, RoutedEventArgs e)
         {
             BackupImportModal.Visibility = Visibility.Visible;
-            SwitchTab("JSON");
+            SwitchTab("QR");
         }
 
         private void BtnCloseBackupImport_Click(object sender, RoutedEventArgs e)
@@ -703,6 +847,10 @@ namespace AuthenticatorDesktop
         private void SwitchTab(string tabName)
         {
             // Reset tab styling
+            BtnTabQr.BorderBrush = Brushes.Transparent;
+            BtnTabQr.Foreground = (SolidColorBrush)Resources["TextSecondary"];
+            BtnTabQr.FontWeight = FontWeights.Normal;
+
             BtnTabJson.BorderBrush = Brushes.Transparent;
             BtnTabJson.Foreground = (SolidColorBrush)Resources["TextSecondary"];
             BtnTabJson.FontWeight = FontWeights.Normal;
@@ -720,13 +868,21 @@ namespace AuthenticatorDesktop
             BtnTabTrash.FontWeight = FontWeights.Normal;
 
             // Hide panels
+            PanelTabQr.Visibility = Visibility.Collapsed;
             PanelTabJson.Visibility = Visibility.Collapsed;
             PanelTabCsv.Visibility = Visibility.Collapsed;
             PanelTabSheet.Visibility = Visibility.Collapsed;
             PanelTabTrash.Visibility = Visibility.Collapsed;
 
             // Show selected panel
-            if (tabName == "JSON")
+            if (tabName == "QR")
+            {
+                BtnTabQr.BorderBrush = (SolidColorBrush)Resources["PrimaryBlue"];
+                BtnTabQr.Foreground = (SolidColorBrush)Resources["TextPrimary"];
+                BtnTabQr.FontWeight = FontWeights.SemiBold;
+                PanelTabQr.Visibility = Visibility.Visible;
+            }
+            else if (tabName == "JSON")
             {
                 BtnTabJson.BorderBrush = (SolidColorBrush)Resources["PrimaryBlue"];
                 BtnTabJson.Foreground = (SolidColorBrush)Resources["TextPrimary"];
@@ -756,6 +912,168 @@ namespace AuthenticatorDesktop
                 
                 TrashList.ItemsSource = null;
                 TrashList.ItemsSource = _deletedAccounts;
+            }
+        }
+
+        // ==================== QR CODE SCANNER ENGINE ====================
+
+        private bool ScanBitmapForQrCode(System.Drawing.Bitmap bitmap)
+        {
+            try
+            {
+                var reader = new ZXing.Windows.Compatibility.BarcodeReader
+                {
+                    AutoRotate = true,
+                    Options = new ZXing.Common.DecodingOptions
+                    {
+                        TryHarder = true
+                    }
+                };
+
+                var result = reader.Decode(bitmap);
+                if (result != null && !string.IsNullOrWhiteSpace(result.Text))
+                {
+                    string uri = result.Text.Trim();
+                    if (ParseAndAddOtpAuthUri(uri))
+                    {
+                        SaveAccounts();
+                        UpdateUIList();
+                        UpdatePins();
+                        return true;
+                    }
+                    else
+                    {
+                        int idx = uri.IndexOf("otpauth://", StringComparison.OrdinalIgnoreCase);
+                        if (idx >= 0)
+                        {
+                            string cleanUri = uri.Substring(idx);
+                            if (ParseAndAddOtpAuthUri(cleanUri))
+                            {
+                                SaveAccounts();
+                                UpdateUIList();
+                                UpdatePins();
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+            return false;
+        }
+
+        private async void BtnScanScreenQr_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
+            await System.Threading.Tasks.Task.Delay(350);
+
+            try
+            {
+                int screenWidth = (int)SystemParameters.PrimaryScreenWidth;
+                int screenHeight = (int)SystemParameters.PrimaryScreenHeight;
+
+                using (var bmp = new System.Drawing.Bitmap(screenWidth, screenHeight))
+                {
+                    using (var g = System.Drawing.Graphics.FromImage(bmp))
+                    {
+                        g.CopyFromScreen(0, 0, 0, 0, bmp.Size);
+                    }
+
+                    bool success = ScanBitmapForQrCode(bmp);
+
+                    this.WindowState = WindowState.Normal;
+                    this.Activate();
+
+                    if (success)
+                    {
+                        MessageBox.Show("Quét mã QR trên màn hình thành công! Tài khoản 2FA mới đã được tự động thêm vào thiết bị.", "Quét QR Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
+                        BackupImportModal.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        MessageBox.Show("Không tìm thấy mã QR 2FA hợp lệ trên màn hình.\nVui lòng đảm bảo mã QR (trên Facebook, Google, Discord...) đang hiển thị rõ trên màn hình máy tính.", "Không tìm thấy QR", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                this.WindowState = WindowState.Normal;
+                this.Activate();
+                MessageBox.Show("Có lỗi xảy ra khi chụp và quét màn hình: " + ex.Message, "Lỗi quét QR", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void BtnImportQrImage_Click(object sender, RoutedEventArgs e)
+        {
+            var ofd = new OpenFileDialog
+            {
+                Title = "Chọn file ảnh chứa Mã QR 2FA",
+                Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp;*.webp)|*.png;*.jpg;*.jpeg;*.bmp;*.webp"
+            };
+
+            if (ofd.ShowDialog() == true)
+            {
+                try
+                {
+                    using (var bmp = new System.Drawing.Bitmap(ofd.FileName))
+                    {
+                        bool success = ScanBitmapForQrCode(bmp);
+                        if (success)
+                        {
+                            MessageBox.Show("Đọc mã QR từ ảnh thành công! Tài khoản 2FA mới đã được thêm vào thiết bị.", "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                            BackupImportModal.Visibility = Visibility.Collapsed;
+                        }
+                        else
+                        {
+                            MessageBox.Show("Không thể trích xuất thông tin 2FA từ hình ảnh này.\nVui lòng đảm bảo hình ảnh rõ nét và chứa mã QR chuẩn 2FA (otpauth://).", "Lỗi mã QR", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Đọc tệp hình ảnh thất bại: " + ex.Message, "Lỗi file", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void Window_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+                if (files != null && files.Length > 0)
+                {
+                    int addedCount = 0;
+                    foreach (var file in files)
+                    {
+                        string ext = System.IO.Path.GetExtension(file).ToLower();
+                        if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".bmp" || ext == ".webp")
+                        {
+                            try
+                            {
+                                using (var bmp = new System.Drawing.Bitmap(file))
+                                {
+                                    if (ScanBitmapForQrCode(bmp))
+                                    {
+                                        addedCount++;
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+                    }
+
+                    if (addedCount > 0)
+                    {
+                        MessageBox.Show($"Thành công! Đã quét và nhập {addedCount} tài khoản 2FA mới từ hình ảnh kéo thả vào ứng dụng.", "Nhập Kéo & Thả Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
+                        if (AddModal.Visibility == Visibility.Visible) AddModal.Visibility = Visibility.Collapsed;
+                        if (BackupImportModal.Visibility == Visibility.Visible) BackupImportModal.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        MessageBox.Show("Không trích xuất được tài khoản 2FA nào từ hình ảnh đã thả vào ứng dụng.\nVui lòng đảm bảo hình ảnh chứa mã QR chuẩn 2FA (otpauth://).", "Lỗi mã QR", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
+                }
             }
         }
 
@@ -833,6 +1151,107 @@ namespace AuthenticatorDesktop
         private void BtnImportJson_Click(object sender, RoutedEventArgs e)
         {
             ImportBackup();
+        }
+
+        private void BtnExportGhostBak_Click(object sender, RoutedEventArgs e)
+        {
+            if (_allAccounts.Count == 0)
+            {
+                MessageBox.Show("Không có tài khoản nào để sao lưu.", "Sao lưu", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            string password = Microsoft.VisualBasic.Interaction.InputBox(
+                "Nhập mật khẩu bảo vệ file sao lưu (bạn sẽ cần mật khẩu này để giải mã khi khôi phục):",
+                "Mật Khẩu Sao Lưu Encrypted .ghostbak",
+                "");
+
+            if (string.IsNullOrWhiteSpace(password))
+            {
+                MessageBox.Show("Mật khẩu sao lưu không được để trống.", "Hủy sao lưu", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var sfd = new SaveFileDialog
+            {
+                Filter = "Ghost Authenticator Backup (*.ghostbak)|*.ghostbak",
+                FileName = $"ghost_authenticator_backup_{DateTime.Now:yyyyMMdd}.ghostbak"
+            };
+
+            if (sfd.ShowDialog() == true)
+            {
+                try
+                {
+                    string json = JsonSerializer.Serialize(_allAccounts);
+                    byte[] encryptedBytes = Crypto.EncryptGhostBak(json, password);
+                    File.WriteAllBytes(sfd.FileName, encryptedBytes);
+                    MessageBox.Show("Xuất file sao lưu mã hóa (.ghostbak) an toàn thành công!\nFile đã được bảo vệ bằng mật khẩu và có thể lưu trữ trên Cloud/USB mà không lo bị lộ 2FA.", "Sao lưu mã hóa thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Có lỗi xảy ra khi tạo file sao lưu: " + ex.Message, "Lỗi sao lưu", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void BtnImportGhostBak_Click(object sender, RoutedEventArgs e)
+        {
+            var ofd = new OpenFileDialog
+            {
+                Filter = "Ghost Authenticator Backup (*.ghostbak)|*.ghostbak"
+            };
+
+            if (ofd.ShowDialog() == true)
+            {
+                string password = Microsoft.VisualBasic.Interaction.InputBox(
+                    "Nhập mật khẩu đã dùng để khóa file sao lưu .ghostbak này:",
+                    "Giải Mã File Sao Lưu",
+                    "");
+
+                if (string.IsNullOrWhiteSpace(password))
+                {
+                    MessageBox.Show("Vui lòng nhập mật khẩu để giải mã file.", "Hủy mở file", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                try
+                {
+                    byte[] encryptedBytes = File.ReadAllBytes(ofd.FileName);
+                    string json = Crypto.DecryptGhostBak(encryptedBytes, password);
+                    var imported = JsonSerializer.Deserialize<List<Account>>(json);
+                    if (imported == null) throw new Exception("File giải mã không chứa dữ liệu tài khoản hợp lệ.");
+
+                    int added = 0;
+                    foreach (var acc in imported)
+                    {
+                        if (!string.IsNullOrEmpty(acc.Issuer) && !string.IsNullOrEmpty(acc.Label) && !string.IsNullOrEmpty(acc.Secret))
+                        {
+                            if (AddAccountQuietly(acc.Issuer, acc.Label, acc.Secret))
+                            {
+                                if (string.IsNullOrEmpty(acc.Id)) acc.Id = Guid.NewGuid().ToString();
+                                added++;
+                            }
+                        }
+                    }
+
+                    if (added > 0)
+                    {
+                        SaveAccounts();
+                        UpdateUIList();
+                        UpdatePins();
+                        MessageBox.Show($"Giải mã và nhập thành công {added} tài khoản 2FA mới từ file sao lưu mã hóa!", "Khôi phục thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                        BackupImportModal.Visibility = Visibility.Collapsed;
+                    }
+                    else
+                    {
+                        MessageBox.Show("Không tìm thấy tài khoản mới nào hợp lệ (hoặc tất cả tài khoản đã tồn tại).", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Giải mã file sao lưu thất bại. Mật khẩu không đúng hoặc file đã bị hư hỏng/chỉnh sửa.\nChi tiết: " + ex.Message, "Lỗi giải mã", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
         }
 
         private void ExportBackup()

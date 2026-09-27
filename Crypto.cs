@@ -89,5 +89,48 @@ namespace AuthenticatorDesktop
                 }
             }
         }
+        // Encrypted Backup (.ghostbak) Container Support
+        private static readonly byte[] GhostBakHeader = Encoding.UTF8.GetBytes("GHOSTBAK_V1");
+
+        public static byte[] EncryptGhostBak(string plainTextJson, string password)
+        {
+            byte[] salt = GenerateRandomBytes(16);
+            byte[] key = DeriveKey(password, salt);
+            byte[] plainBytes = Encoding.UTF8.GetBytes(plainTextJson);
+            byte[] cipherWithIv = Encrypt(plainBytes, key);
+
+            using (var ms = new MemoryStream())
+            {
+                ms.Write(GhostBakHeader, 0, GhostBakHeader.Length);
+                ms.Write(salt, 0, salt.Length);
+                ms.Write(cipherWithIv, 0, cipherWithIv.Length);
+                return ms.ToArray();
+            }
+        }
+
+        public static string DecryptGhostBak(byte[] fileBytes, string password)
+        {
+            if (fileBytes.Length < GhostBakHeader.Length + 16 + 16)
+                throw new InvalidDataException("Tệp tin sao lưu .ghostbak không hợp lệ hoặc bị hư hỏng.");
+
+            for (int i = 0; i < GhostBakHeader.Length; i++)
+            {
+                if (fileBytes[i] != GhostBakHeader[i])
+                    throw new InvalidDataException("Tệp tin không đúng định dạng sao lưu .ghostbak.");
+            }
+
+            int saltOffset = GhostBakHeader.Length;
+            byte[] salt = new byte[16];
+            Array.Copy(fileBytes, saltOffset, salt, 0, 16);
+
+            byte[] key = DeriveKey(password, salt);
+
+            int cipherOffset = saltOffset + 16;
+            byte[] cipherWithIv = new byte[fileBytes.Length - cipherOffset];
+            Array.Copy(fileBytes, cipherOffset, cipherWithIv, 0, cipherWithIv.Length);
+
+            byte[] decryptedBytes = Decrypt(cipherWithIv, key);
+            return Encoding.UTF8.GetString(decryptedBytes);
+        }
     }
 }

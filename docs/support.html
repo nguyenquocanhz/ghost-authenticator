@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Support & FAQ - Ghost Authenticator</title>
+  <meta name="description" content="Official Help Center, FAQ, and Customer Support contact for Ghost Authenticator on Microsoft Store.">
+  <link rel="icon" type="image/png" href="assets/logo.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Navigation -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="brand">
+        <img src="assets/logo.png" alt="Ghost Authenticator Logo">
+        <span>Ghost Authenticator</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="index.html">Overview</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+        <li><a href="terms.html">Terms of Service</a></li>
+        <li><a href="support.html" class="active">Support & FAQ</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Content -->
+  <main class="container">
+    <div class="content-narrow">
+      <div class="legal-card">
+        <div class="legal-header">
+          <div class="badge" style="margin-bottom: 12px;">Customer Care • Policy 10.14</div>
+          <h1>Support & Frequently Asked Questions</h1>
+          <p>Need help with Ghost Authenticator? Find answers below or get in touch with our team.</p>
+        </div>
+
+        <div class="legal-content">
+          <h2>Contact Developer Support</h2>
+          <p>For technical assistance, bug reports, feature requests, or Microsoft Store verification inquiries, feel free to contact us:</p>
+
+          <div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 30px;">
+            <a href="mailto:nguyenquocanh.dev@gmail.com" class="btn btn-primary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+              </svg>
+              Email Support
+            </a>
+            <a href="https://github.com/nguyenquocanhz/ghost-authenticator/issues" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              Report an Issue on GitHub
+            </a>
+          </div>
+
+          <h2>Frequently Asked Questions (FAQ)</h2>
+
+          <!-- FAQ 1 -->
+          <div class="faq-item">
+            <div class="faq-question">
+              <span>Why is my 2FA code showing "Invalid Code" when logging in?</span>
+              <span>+</span>
+            </div>
+            <div class="faq-answer">
+              <p>TOTP (Time-based One-Time Passwords) rely heavily on exact time synchronization. If your Windows PC clock is even 30 to 60 seconds off from standard UTC time, the generated OTP code will not match the server's expected code.</p>
+              <p><strong>Solution:</strong> Open Windows <strong>Settings</strong> &rarr; <strong>Time & Language</strong> &rarr; <strong>Date & Time</strong>, and click <strong>"Sync now"</strong> to synchronize your clock with Windows time servers (<code>time.windows.com</code>).</p>
+            </div>
+          </div>
+
+          <!-- FAQ 2 -->
+          <div class="faq-item">
+            <div class="faq-question">
+              <span>How are my 2FA secret keys encrypted?</span>
+              <span>+</span>
+            </div>
+            <div class="faq-answer">
+              <p>Ghost Authenticator utilizes authenticated <strong>AES-256 GCM</strong> encryption. The key is derived using <strong>PBKDF2 with SHA-256 (100,000 rounds)</strong> combined with a cryptographically random salt. This makes brute-force attacks computationally infeasible.</p>
+            </div>
+          </div>
+
+          <!-- FAQ 3 -->
+          <div class="faq-item">
+            <div class="faq-question">
+              <span>Can the developer recover my forgotten master password?</span>
+              <span>+</span>
+            </div>
+            <div class="faq-answer">
+              <p><strong>No.</strong> Ghost Authenticator is designed on a zero-knowledge architecture. There are no backdoor keys or remote recovery servers. If you forget your master password, your encrypted local database cannot be recovered. Always store a backup of your emergency 2FA backup codes in a safe place.</p>
+            </div>
+          </div>
+
+          <!-- FAQ 4 -->
+          <div class="faq-item">
+            <div class="faq-question">
+              <span>Does Ghost Authenticator send my data to cloud servers?</span>
+              <span>+</span>
+            </div>
+            <div class="faq-answer">
+              <p><strong>No.</strong> The application is 100% offline-first. It does not communicate with external servers, telemetry collectors, or cloud analytics. All authentication calculations occur strictly in-memory on your local CPU.</p>
+            </div>
+          </div>
+
+          <!-- FAQ 5 -->
+          <div class="faq-item">
+            <div class="faq-question">
+              <span>Which Windows versions are supported?</span>
+              <span>+</span>
+            </div>
+            <div class="faq-answer">
+              <p>Ghost Authenticator requires <strong>Windows 10 (version 19041 / 2004 or newer)</strong> and <strong>Windows 11</strong> (64-bit x64 or ARM64 architecture).</p>
+            </div>
+          </div>
+
+          <!-- FAQ 6 -->
+          <div class="faq-item">
+            <div class="faq-question">
+              <span>How do I cleanly uninstall Ghost Authenticator?</span>
+              <span>+</span>
+            </div>
+            <div class="faq-answer">
+              <p>If installed via Microsoft Store, simply right-click <strong>Ghost Authenticator</strong> in the Start Menu and select <strong>Uninstall</strong>. Windows Store takes care of removing all application binaries and its sandboxed storage cleanly (in accordance with Store Policy 10.2.7).</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-container">
+      <div class="footer-brand">
+        <img src="assets/logo.png" alt="Ghost Authenticator">
+        <span>Ghost Authenticator</span>
+      </div>
+      <ul class="footer-links">
+        <li><a href="index.html">Overview</a></li>
+        <li><a href="privacy.html">Privacy Policy</a></li>
+        <li><a href="terms.html">Terms of Service</a></li>
+        <li><a href="support.html">Support</a></li>
+      </ul>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 Ghost Authenticator. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script>
+    const themeToggleBtn = document.getElementById('themeToggle');
+    const root = document.documentElement;
+    const savedTheme = localStorage.getItem('ghost-theme') || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    root.setAttribute('data-theme', savedTheme);
+    themeToggleBtn.addEventListener('click', () => {
+      const current = root.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      localStorage.setItem('ghost-theme', next);
+    });
+  </script>
+</body>
+</html>
