@@ -1,6 +1,8 @@
 # Compilation outputs
 bin/
 obj/
+dist/
+*.msix
 *.user
 *.userosscache
 *.sln.docstates
