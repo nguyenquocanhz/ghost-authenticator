@@ -63,7 +63,8 @@ echo.
 
 :: 3. Bien dich ung dung
 echo [1/4] Dang bien dich du an (Release x64)...
-dotnet publish Authenticator.csproj -c Release -r win-x64 --self-contained false -p:Platform=x64
+:: Self-contained: Store khong tu cai .NET Desktop Runtime, may thieu runtime se khong mo duoc app
+dotnet publish Authenticator.csproj -c Release -r win-x64 --self-contained true -p:Platform=x64
 if %errorlevel% neq 0 (
     echo [LOI] dotnet publish that bai!
     pause
@@ -85,7 +86,8 @@ copy /y "Package.appxmanifest" "%STAGE_DIR%\AppxManifest.xml" >nul
 
 :: 5. Tao index tai nguyen PRI
 echo [3/4] Dang index tai nguyen giao dien (makepri)...
-"!MAKEPRI!" createconfig /cf "%STAGE_DIR%\priconfig.xml" /dq en-US /o >nul
+:: App ho tro tieng Anh va tieng Viet (khop voi <Resources> trong Package.appxmanifest)
+"!MAKEPRI!" createconfig /cf "%STAGE_DIR%\priconfig.xml" /dq en-US_vi-VN /o >nul
 "!MAKEPRI!" new /pr "%STAGE_DIR%" /cf "%STAGE_DIR%\priconfig.xml" /of "%STAGE_DIR%\resources.pri" /o >nul
 if exist "%STAGE_DIR%\priconfig.xml" del "%STAGE_DIR%\priconfig.xml" >nul
 

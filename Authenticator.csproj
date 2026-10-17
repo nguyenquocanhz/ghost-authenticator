@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <None Include="Package.appxmanifest" />
+    <EmbeddedResource Include="Strings.lang" LogicalName="AuthenticatorDesktop.Strings.lang" />
     <Content Include="Images\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

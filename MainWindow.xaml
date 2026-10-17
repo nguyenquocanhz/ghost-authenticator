@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:AuthenticatorDesktop"
         mc:Ignorable="d"
         Title="Ghost Authenticator" Height="600" Width="850" MinWidth="600" MinHeight="450"
         WindowStartupLocation="CenterScreen" Background="{DynamicResource WinBg}" Icon="asset/93cca52a-7f6f-40dd-8dba-7ba23fdcd6dc.png"
@@ -113,8 +114,8 @@
                 </Border.Effect>
                 <StackPanel>
                     <Image Source="asset/93cca52a-7f6f-40dd-8dba-7ba23fdcd6dc.png" Width="64" Height="64" HorizontalAlignment="Center" Margin="0,0,0,16"/>
-                    <TextBlock Text="Chào mừng tới Ghost Authenticator" FontSize="19" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-                    <TextBlock Text="Vui lòng chọn khởi tạo kho bảo mật mới hoặc khôi phục dữ liệu 2FA của bạn." FontSize="12" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,24"/>
+                    <TextBlock Text="{local:Loc Welcome_Title}" FontSize="19" FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="{local:Loc Welcome_Subtitle}" FontSize="12" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,24"/>
 
                     <!-- Choice 1: Create New -->
                     <Button x:Name="BtnChoiceCreateNew" Style="{StaticResource PrimaryBtn}" Margin="0,0,0,12" Click="BtnChoiceCreateNew_Click">
@@ -125,8 +126,8 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="White" VerticalAlignment="Center" Margin="0,0,12,0"/>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="Tạo Kho Mới (Create New Vault)" FontSize="14" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Thiết lập mật khẩu chính mới cho ứng dụng" FontSize="11" Foreground="#F1F5F9" Margin="0,2,0,0"/>
+                                <TextBlock Text="{local:Loc Welcome_CreateTitle}" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="{local:Loc Welcome_CreateHint}" FontSize="11" Foreground="#F1F5F9" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Button>
@@ -140,8 +141,8 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="&#xE8B6;" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#1A73E8" VerticalAlignment="Center" Margin="0,0,12,0"/>
                             <StackPanel Grid.Column="1">
-                                <TextBlock Text="Khôi Phục Dữ Liệu (Restore Backup)" FontSize="14" FontWeight="Bold" Foreground="#0F172A"/>
-                                <TextBlock Text="Phục hồi từ file .ghostbak, JSON hoặc CSV cũ" FontSize="11" Foreground="#475569" Margin="0,2,0,0"/>
+                                <TextBlock Text="{local:Loc Welcome_RestoreTitle}" FontSize="14" FontWeight="Bold" Foreground="#0F172A"/>
+                                <TextBlock Text="{local:Loc Welcome_RestoreHint}" FontSize="11" Foreground="#475569" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Grid>
                     </Button>
@@ -156,18 +157,18 @@
                 <StackPanel>
                     <!-- Icon Shield -->
                     <Image Source="asset/93cca52a-7f6f-40dd-8dba-7ba23fdcd6dc.png" Width="54" Height="54" HorizontalAlignment="Center" Margin="0,0,0,16"/>
-                    <TextBlock Text="Thiết lập mật khẩu chính" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-                    <TextBlock Text="Mật khẩu chính dùng để bảo mật và mã hóa toàn bộ dữ liệu 2FA của bạn." FontSize="12" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,24"/>
+                    <TextBlock Text="{local:Loc Setup_Title}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="{local:Loc Setup_Subtitle}" FontSize="12" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,24"/>
 
                     <!-- Password -->
-                    <TextBlock Text="Mật khẩu mới (Master Password)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{local:Loc Setup_NewPassword}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
                     <PasswordBox x:Name="TxtNewPassword" PasswordChar="●" Padding="10,8" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource InputBg}" Foreground="{DynamicResource TextPrimary}" BorderThickness="1" KeyDown="TxtNewPassword_KeyDown" Margin="0,0,0,14"/>
 
                     <!-- Confirm Password -->
-                    <TextBlock Text="Xác nhận mật khẩu" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{local:Loc Setup_Confirm}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
                     <PasswordBox x:Name="TxtConfirmPassword" PasswordChar="●" Padding="10,8" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource InputBg}" Foreground="{DynamicResource TextPrimary}" BorderThickness="1" KeyDown="TxtConfirmPassword_KeyDown" Margin="0,0,0,20"/>
 
-                    <Button Content="Thiết lập mật khẩu" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="14,10" FontWeight="Medium" FontSize="14" Click="BtnSetupPassword_Click">
+                    <Button Content="{local:Loc Setup_Button}" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="14,10" FontWeight="Medium" FontSize="14" Click="BtnSetupPassword_Click">
                         <Button.Resources>
                             <Style TargetType="{x:Type Border}">
                                 <Setter Property="CornerRadius" Value="6"/>
@@ -185,18 +186,18 @@
                 <StackPanel>
                     <!-- Icon Lock -->
                     <Image Source="asset/93cca52a-7f6f-40dd-8dba-7ba23fdcd6dc.png" Width="54" Height="54" HorizontalAlignment="Center" Margin="0,0,0,16"/>
-                    <TextBlock Text="Mở khóa ứng dụng" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
-                    <TextBlock Text="Nhập mật khẩu chính để giải mã danh sách tài khoản 2FA." FontSize="12" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,24"/>
+                    <TextBlock Text="{local:Loc Unlock_Title}" FontSize="18" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                    <TextBlock Text="{local:Loc Unlock_Subtitle}" FontSize="12" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,24"/>
 
                     <!-- Password Input -->
-                    <TextBlock Text="Mật khẩu chính (Master Password)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{local:Loc Unlock_PasswordLabel}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
                     <Grid Margin="0,0,0,20">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <PasswordBox x:Name="TxtMasterPassword" Grid.Column="0" PasswordChar="●" Padding="10,8" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource InputBg}" Foreground="{DynamicResource TextPrimary}" BorderThickness="1" KeyDown="TxtMasterPassword_KeyDown"/>
-                        <Button x:Name="BtnHelloUnlock" Grid.Column="1" Content="&#xE1D6;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="38" Margin="8,0,0,0" Padding="0" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Foreground="{DynamicResource TextPrimary}" Click="BtnHelloUnlock_Click" ToolTip="Mở khóa bằng Windows Hello (FaceID / Vân tay)" Visibility="Collapsed">
+                        <Button x:Name="BtnHelloUnlock" Grid.Column="1" Content="&#xE1D6;" FontFamily="Segoe MDL2 Assets" FontSize="16" Width="38" Margin="8,0,0,0" Padding="0" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Foreground="{DynamicResource TextPrimary}" Click="BtnHelloUnlock_Click" ToolTip="{local:Loc Unlock_Hello}" AutomationProperties.Name="{local:Loc Unlock_Hello}" Visibility="Collapsed">
                             <Button.Resources>
                                 <Style TargetType="{x:Type Border}">
                                     <Setter Property="CornerRadius" Value="6"/>
@@ -205,7 +206,7 @@
                         </Button>
                     </Grid>
 
-                    <Button Content="Mở khóa" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="14,10" FontWeight="Medium" FontSize="14" Click="BtnUnlock_Click">
+                    <Button Content="{local:Loc Unlock_Button}" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="14,10" FontWeight="Medium" FontSize="14" Click="BtnUnlock_Click">
                         <Button.Resources>
                             <Style TargetType="{x:Type Border}">
                                 <Setter Property="CornerRadius" Value="6"/>
@@ -252,7 +253,7 @@
                             </TextBox.Resources>
                         </TextBox>
                         <TextBlock Text="&#xE721;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="10,0,0,0" IsHitTestVisible="False"/>
-                        <TextBlock Text="Tìm kiếm..." Foreground="{DynamicResource TextSecondary}" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="30,0,0,0" IsHitTestVisible="False">
+                        <TextBlock Text="{local:Loc Search_Placeholder}" Foreground="{DynamicResource TextSecondary}" FontSize="13" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="30,0,0,0" IsHitTestVisible="False">
                             <TextBlock.Style>
                                 <Style TargetType="{x:Type TextBlock}">
                                     <Setter Property="Visibility" Value="Collapsed"/>
@@ -275,12 +276,12 @@
                         </Button.Resources>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE109;" FontFamily="Segoe MDL2 Assets" FontSize="11" Margin="0,1,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="Thêm thủ công" FontSize="13" VerticalAlignment="Center"/>
+                            <TextBlock Text="{local:Loc Add_Manual}" FontSize="13" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
 
                     <!-- Quick QR Scan Button -->
-                    <Button x:Name="BtnQuickQr" Background="Transparent" BorderBrush="{DynamicResource PrimaryBlue}" BorderThickness="1" Foreground="{DynamicResource PrimaryBlue}" Padding="10,7" FontWeight="Medium" Click="BtnScanScreenQr_Click" ToolTip="Quét mã QR trực tiếp từ màn hình">
+                    <Button x:Name="BtnQuickQr" Background="Transparent" BorderBrush="{DynamicResource PrimaryBlue}" BorderThickness="1" Foreground="{DynamicResource PrimaryBlue}" Padding="10,7" FontWeight="Medium" Click="BtnScanScreenQr_Click" ToolTip="{local:Loc QuickQr_Tooltip}">
                         <Button.Resources>
                             <Style TargetType="{x:Type Border}">
                                 <Setter Property="CornerRadius" Value="6"/>
@@ -288,25 +289,30 @@
                         </Button.Resources>
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xED14;" FontFamily="Segoe MDL2 Assets" FontSize="13" Margin="0,1,6,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="Quét QR Màn Hình" FontSize="13" VerticalAlignment="Center"/>
+                            <TextBlock Text="{local:Loc QuickQr_Button}" FontSize="13" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>
 
                 <!-- Icon Action Buttons -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Lock -->
+                    <Button x:Name="BtnLock" ToolTip="{local:Loc Lock_Tooltip}" AutomationProperties.Name="{local:Loc Lock_Name}" Background="Transparent" BorderThickness="0" Width="34" Height="34" Margin="0,0,4,0" Click="BtnLock_Click">
+                        <TextBlock Text="&#xE72E;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Button>
+
                     <!-- Backup -->
-                    <Button x:Name="BtnBackup" ToolTip="Sao lưu / Nhập dữ liệu" Background="Transparent" BorderThickness="0" Width="34" Height="34" Margin="0,0,4,0" Click="BtnBackup_Click">
+                    <Button x:Name="BtnBackup" ToolTip="{local:Loc Backup_Tooltip}" AutomationProperties.Name="{local:Loc Backup_Name}" Background="Transparent" BorderThickness="0" Width="34" Height="34" Margin="0,0,4,0" Click="BtnBackup_Click">
                         <TextBlock Text="&#xEA35;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Button>
 
                     <!-- Theme Toggle -->
-                    <Button x:Name="BtnTheme" ToolTip="Giao diện Sáng/Tối" Background="Transparent" BorderThickness="0" Width="34" Height="34" Margin="0,0,4,0" Click="BtnTheme_Click">
+                    <Button x:Name="BtnTheme" ToolTip="{local:Loc Theme_Tooltip}" AutomationProperties.Name="{local:Loc Theme_Name}" Background="Transparent" BorderThickness="0" Width="34" Height="34" Margin="0,0,4,0" Click="BtnTheme_Click">
                         <TextBlock x:Name="ThemeIcon" Text="&#xE708;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Button>
 
                     <!-- About -->
-                    <Button x:Name="BtnAbout" ToolTip="Thông tin ứng dụng" Background="Transparent" BorderThickness="0" Width="34" Height="34" Click="BtnAbout_Click">
+                    <Button x:Name="BtnAbout" ToolTip="{local:Loc About_Title}" AutomationProperties.Name="{local:Loc About_Title}" Background="Transparent" BorderThickness="0" Width="34" Height="34" Click="BtnAbout_Click">
                         <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Button>
                 </StackPanel>
@@ -375,23 +381,29 @@
                             <!-- Action Buttons hidden until hover -->
                             <StackPanel x:Name="ActionPanel" Orientation="Horizontal" VerticalAlignment="Center" Opacity="0">
                                 <!-- Copy Button -->
-                                <Button Background="Transparent" BorderThickness="0" Margin="0,0,8,0" Click="BtnCopyRow_Click" Tag="{Binding}" Width="30" Height="30" ToolTip="Sao chép OTP">
+                                <Button Background="Transparent" BorderThickness="0" Margin="0,0,8,0" Click="BtnCopyRow_Click" Tag="{Binding}" Width="30" Height="30" ToolTip="{local:Loc Row_CopyTooltip}" AutomationProperties.Name="{local:Loc Row_CopyName}">
                                     <TextBlock Text="&#xE8C8;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="{DynamicResource TextSecondary}"/>
                                 </Button>
                                 <!-- View Secret Button -->
-                                <Button Background="Transparent" BorderThickness="0" Margin="0,0,8,0" Click="BtnViewSecret_Click" Tag="{Binding}" Width="30" Height="30" ToolTip="Xem Khóa Bí Mật (Secret Key)">
+                                <Button Background="Transparent" BorderThickness="0" Margin="0,0,8,0" Click="BtnViewSecret_Click" Tag="{Binding}" Width="30" Height="30" ToolTip="{local:Loc Row_ViewTooltip}" AutomationProperties.Name="{local:Loc Row_ViewName}">
                                     <TextBlock Text="&#xE7B3;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="{DynamicResource TextSecondary}"/>
                                 </Button>
                                 <!-- Delete Button -->
-                                <Button Background="Transparent" BorderThickness="0" Click="BtnDeleteRow_Click" Tag="{Binding}" Width="30" Height="30" ToolTip="Xóa tài khoản">
+                                <Button Background="Transparent" BorderThickness="0" Click="BtnDeleteRow_Click" Tag="{Binding}" Width="30" Height="30" ToolTip="{local:Loc Row_Delete}" AutomationProperties.Name="{local:Loc Row_Delete}">
                                     <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="13" Foreground="{DynamicResource DangerRed}"/>
                                 </Button>
                             </StackPanel>
                         </StackPanel>
                     </Grid>
                     <DataTemplate.Triggers>
-                        <!-- Show buttons on hover -->
+                        <!-- Show buttons on hover, and for keyboard users on the selected / focused row -->
                         <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                            <Setter TargetName="ActionPanel" Property="Opacity" Value="1"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                            <Setter TargetName="ActionPanel" Property="Opacity" Value="1"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
                             <Setter TargetName="ActionPanel" Property="Opacity" Value="1"/>
                         </DataTrigger>
                     </DataTemplate.Triggers>
@@ -402,8 +414,8 @@
         <!-- Empty State Placeholder -->
         <StackPanel Grid.Row="2" x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
             <TextBlock Text="&#xEA39;" FontFamily="Segoe MDL2 Assets" FontSize="60" Foreground="{DynamicResource BorderBrush}" HorizontalAlignment="Center" Margin="0,0,0,15"/>
-            <TextBlock Text="Chưa có tài khoản 2FA nào được lưu." FontSize="15" FontWeight="Medium" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" Margin="0,0,0,5"/>
-            <TextBlock Text="Nhấp vào nút '+ Thêm tài khoản' ở trên để cấu hình." FontSize="13" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center"/>
+            <TextBlock x:Name="EmptyTitle" Text="{local:Loc Empty_NoAccounts}" FontSize="15" FontWeight="Medium" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,5"/>
+            <TextBlock x:Name="EmptyHint" Text="{local:Loc Empty_NoAccountsHint}" FontSize="13" Foreground="{DynamicResource TextSecondary}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
         </StackPanel>
 
         <!-- Add Modal Overlay -->
@@ -428,7 +440,7 @@
 
                     <!-- Title -->
                     <Grid Grid.Row="0" Margin="0,0,0,16">
-                        <TextBlock Text="Thêm tài khoản 2FA" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                        <TextBlock Text="{local:Loc AddModal_Title}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
                         <Button x:Name="BtnCloseModal" Background="Transparent" BorderThickness="0" HorizontalAlignment="Right" Click="BtnCloseModal_Click">
                             <TextBlock Text="&#xE10A;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
                         </Button>
@@ -437,22 +449,22 @@
                     <!-- Quick QR Import Section -->
                     <Border Grid.Row="1" Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,16">
                         <StackPanel>
-                            <TextBlock Text="🖼️ Thêm nhanh từ Mã QR Code" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                            <TextBlock Text="{local:Loc AddModal_QuickQr}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="8"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0" Content="📷 Quét màn hình" Style="{StaticResource PrimaryBtn}" Padding="8,6" FontSize="11" Click="BtnScanScreenQr_Click"/>
-                                <Button Grid.Column="2" Content="🖼️ Chọn ảnh QR" Style="{StaticResource SecondaryBtn}" Padding="8,6" FontSize="11" Click="BtnImportQrImage_Click"/>
+                                <Button Grid.Column="0" Content="{local:Loc AddModal_ScanScreen}" Style="{StaticResource PrimaryBtn}" Padding="8,6" FontSize="11" Click="BtnScanScreenQr_Click"/>
+                                <Button Grid.Column="2" Content="{local:Loc AddModal_PickImage}" Style="{StaticResource SecondaryBtn}" Padding="8,6" FontSize="11" Click="BtnImportQrImage_Click"/>
                             </Grid>
                         </StackPanel>
                     </Border>
 
                     <!-- Service name -->
                     <StackPanel Grid.Row="2" Margin="0,0,0,14">
-                        <TextBlock Text="Tên dịch vụ (ví dụ: Google, HostViet)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
+                        <TextBlock Text="{local:Loc AddModal_Issuer}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
                         <TextBox x:Name="InputIssuer" Padding="10,8" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource InputBg}" Foreground="{DynamicResource TextPrimary}" BorderThickness="1">
                             <TextBox.Resources>
                                 <Style TargetType="{x:Type Border}">
@@ -464,7 +476,7 @@
 
                     <!-- Account label -->
                     <StackPanel Grid.Row="3" Margin="0,0,0,14">
-                        <TextBlock Text="Tên tài khoản (Email, nhãn)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
+                        <TextBlock Text="{local:Loc AddModal_Label}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
                         <TextBox x:Name="InputLabel" Padding="10,8" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource InputBg}" Foreground="{DynamicResource TextPrimary}" BorderThickness="1">
                             <TextBox.Resources>
                                 <Style TargetType="{x:Type Border}">
@@ -476,7 +488,7 @@
 
                     <!-- Secret Key -->
                     <StackPanel Grid.Row="4" Margin="0,0,0,20">
-                        <TextBlock Text="Khóa bí mật của bạn (Secret Key)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
+                        <TextBlock Text="{local:Loc AddModal_Secret}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
                         <TextBox x:Name="InputSecret" Padding="10,8" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource InputBg}" Foreground="{DynamicResource TextPrimary}" BorderThickness="1">
                             <TextBox.Resources>
                                 <Style TargetType="{x:Type Border}">
@@ -487,7 +499,7 @@
                     </StackPanel>
 
                     <!-- Submit Button -->
-                    <Button Grid.Row="5" x:Name="BtnSubmitAdd" Content="Thêm thủ công" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="14,10" FontWeight="Medium" FontSize="14" Click="BtnSubmitAdd_Click">
+                    <Button Grid.Row="5" x:Name="BtnSubmitAdd" Content="{local:Loc Add_Manual}" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="14,10" FontWeight="Medium" FontSize="14" Click="BtnSubmitAdd_Click">
                         <Button.Resources>
                             <Style TargetType="{x:Type Border}">
                                 <Setter Property="CornerRadius" Value="6"/>
@@ -516,7 +528,7 @@
                     </Grid.RowDefinitions>
                     <!-- Header -->
                     <Grid Grid.Row="0" Margin="0,0,0,16">
-                        <TextBlock Text="Sao lưu &amp; Nhập dữ liệu hàng loạt" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                        <TextBlock Text="{local:Loc Backup_Title}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
                         <Button x:Name="BtnCloseBackupImport" Background="Transparent" BorderThickness="0" HorizontalAlignment="Right" Click="BtnCloseBackupImport_Click">
                             <TextBlock Text="&#xE10A;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
                         </Button>
@@ -524,60 +536,60 @@
 
                     <!-- Tab Buttons -->
                     <UniformGrid Grid.Row="1" Columns="5" Margin="0,0,0,18">
-                        <Button x:Name="BtnTabQr" Content="Quét Mã QR" Padding="6,6" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="{DynamicResource PrimaryBlue}" Foreground="{DynamicResource TextPrimary}" FontWeight="SemiBold" Click="BtnTab_Click" Tag="QR"/>
-                        <Button x:Name="BtnTabJson" Content="Sao lưu" Padding="6,6" Background="Transparent" BorderThickness="0" BorderBrush="Transparent" Foreground="{DynamicResource TextSecondary}" Click="BtnTab_Click" Tag="JSON"/>
+                        <Button x:Name="BtnTabQr" Content="{local:Loc Tab_Qr}" Padding="6,6" Background="Transparent" BorderThickness="0,0,0,2" BorderBrush="{DynamicResource PrimaryBlue}" Foreground="{DynamicResource TextPrimary}" FontWeight="SemiBold" Click="BtnTab_Click" Tag="QR"/>
+                        <Button x:Name="BtnTabJson" Content="{local:Loc Tab_Backup}" Padding="6,6" Background="Transparent" BorderThickness="0" BorderBrush="Transparent" Foreground="{DynamicResource TextSecondary}" Click="BtnTab_Click" Tag="JSON"/>
                         <Button x:Name="BtnTabCsv" Content="CSV / TXT" Padding="6,6" Background="Transparent" BorderThickness="0" BorderBrush="Transparent" Foreground="{DynamicResource TextSecondary}" Click="BtnTab_Click" Tag="CSV"/>
                         <Button x:Name="BtnTabSheet" Content="Google Sheet" Padding="6,6" Background="Transparent" BorderThickness="0" BorderBrush="Transparent" Foreground="{DynamicResource TextSecondary}" Click="BtnTab_Click" Tag="SHEET"/>
-                        <Button x:Name="BtnTabTrash" Content="Thùng rác" Padding="6,6" Background="Transparent" BorderThickness="0" BorderBrush="Transparent" Foreground="{DynamicResource TextSecondary}" Click="BtnTab_Click" Tag="TRASH"/>
+                        <Button x:Name="BtnTabTrash" Content="{local:Loc Tab_Trash}" Padding="6,6" Background="Transparent" BorderThickness="0" BorderBrush="Transparent" Foreground="{DynamicResource TextSecondary}" Click="BtnTab_Click" Tag="TRASH"/>
                     </UniformGrid>
 
                     <!-- Tab Content Panel -->
                     <Grid Grid.Row="2" MinHeight="220" VerticalAlignment="Top">
                         <!-- Tab 0: QR Code Scanner & Image Import -->
                         <StackPanel x:Name="PanelTabQr" Visibility="Visible">
-                            <TextBlock Text="Nhập tài khoản 2FA bằng Mã QR (QR Code Scanner)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,6"/>
-                            <TextBlock Text="Quét trực tiếp mã QR 2FA đang hiển thị trên màn hình máy tính hoặc tải lên file ảnh mã QR." FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,14"/>
+                            <TextBlock Text="{local:Loc Qr_Title}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,6"/>
+                            <TextBlock Text="{local:Loc Qr_Subtitle}" FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,14"/>
 
                             <Border Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                                 <StackPanel>
-                                    <TextBlock Text="📷 Quét mã QR trực tiếp trên màn hình" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,4"/>
-                                    <TextBlock Text="Tự động chụp màn hình và trích xuất khóa 2FA từ trang web (Facebook, Google, Discord...)" FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,10"/>
-                                    <Button Content="Quét QR trên màn hình" Style="{StaticResource PrimaryBtn}" Padding="10,8" Click="BtnScanScreenQr_Click"/>
+                                    <TextBlock Text="{local:Loc Qr_ScreenTitle}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="{local:Loc Qr_ScreenHint}" FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                    <Button Content="{local:Loc Qr_ScreenButton}" Style="{StaticResource PrimaryBtn}" Padding="10,8" Click="BtnScanScreenQr_Click"/>
                                 </StackPanel>
                             </Border>
 
                             <Border Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12">
                                 <StackPanel>
-                                    <TextBlock Text="🖼️ Nhập mã QR từ File Ảnh" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,4"/>
-                                    <TextBlock Text="Chọn tệp tin hình ảnh (.png, .jpg, .jpeg, .bmp) chứa mã QR 2FA" FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,10"/>
-                                    <Button Content="Chọn file ảnh QR" Style="{StaticResource SecondaryBtn}" Padding="10,8" Click="BtnImportQrImage_Click"/>
+                                    <TextBlock Text="{local:Loc Qr_FileTitle}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,4"/>
+                                    <TextBlock Text="{local:Loc Qr_FileHint}" FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                                    <Button Content="{local:Loc Qr_FileButton}" Style="{StaticResource SecondaryBtn}" Padding="10,8" Click="BtnImportQrImage_Click"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>
 
                         <!-- Tab 1: Encrypted & JSON Backup -->
                         <StackPanel x:Name="PanelTabJson" Visibility="Collapsed">
-                            <TextBlock Text="Sao lưu an toàn (Encrypted .ghostbak &amp; JSON)" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,6"/>
-                            <TextBlock Text="Khuyến nghị: Xuất file sao lưu mã hóa (.ghostbak) được bảo vệ bằng mật khẩu để chống lộ mã 2FA khi lưu trữ trên Cloud/USB." FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,14"/>
+                            <TextBlock Text="{local:Loc BackupTab_Title}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,6"/>
+                            <TextBlock Text="{local:Loc BackupTab_Hint}" FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,14"/>
                             
                             <!-- Encrypted Backup Section -->
                             <Border Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
                                 <StackPanel>
-                                    <TextBlock Text="🔒 Sao lưu mã hóa (.ghostbak)" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                                    <TextBlock Text="{local:Loc BackupTab_Encrypted}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="8"/>
                                             <ColumnDefinition Width="*"/>
                                         </Grid.ColumnDefinitions>
-                                        <Button Grid.Column="0" Content="Xuất file .ghostbak" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="10,8" FontWeight="Medium" FontSize="12" Click="BtnExportGhostBak_Click">
+                                        <Button Grid.Column="0" Content="{local:Loc BackupTab_Export}" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="10,8" FontWeight="Medium" FontSize="12" Click="BtnExportGhostBak_Click">
                                             <Button.Resources>
                                                 <Style TargetType="{x:Type Border}">
                                                     <Setter Property="CornerRadius" Value="6"/>
                                                 </Style>
                                             </Button.Resources>
                                         </Button>
-                                        <Button Grid.Column="2" Content="Nhập file .ghostbak" Background="Transparent" BorderBrush="{DynamicResource PrimaryBlue}" Foreground="{DynamicResource PrimaryBlue}" BorderThickness="1" Padding="10,8" FontWeight="Medium" FontSize="12" Click="BtnImportGhostBak_Click">
+                                        <Button Grid.Column="2" Content="{local:Loc BackupTab_Import}" Background="Transparent" BorderBrush="{DynamicResource PrimaryBlue}" Foreground="{DynamicResource PrimaryBlue}" BorderThickness="1" Padding="10,8" FontWeight="Medium" FontSize="12" Click="BtnImportGhostBak_Click">
                                             <Button.Resources>
                                                 <Style TargetType="{x:Type Border}">
                                                     <Setter Property="CornerRadius" Value="6"/>
@@ -595,14 +607,14 @@
                                     <ColumnDefinition Width="8"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0" Content="Xuất JSON (Bản rõ)" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" Foreground="{DynamicResource TextSecondary}" BorderThickness="1" Padding="10,6" FontSize="11" Click="BtnExportJson_Click" ToolTip="Cảnh báo: Bản rõ JSON không mã hóa!">
+                                <Button Grid.Column="0" Content="{local:Loc BackupTab_ExportJson}" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" Foreground="{DynamicResource TextSecondary}" BorderThickness="1" Padding="10,6" FontSize="11" Click="BtnExportJson_Click" ToolTip="{local:Loc BackupTab_JsonWarning}">
                                     <Button.Resources>
                                         <Style TargetType="{x:Type Border}">
                                             <Setter Property="CornerRadius" Value="6"/>
                                         </Style>
                                     </Button.Resources>
                                 </Button>
-                                <Button Grid.Column="2" Content="Nhập JSON (Bản rõ)" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" Foreground="{DynamicResource TextSecondary}" BorderThickness="1" Padding="10,6" FontSize="11" Click="BtnImportJson_Click">
+                                <Button Grid.Column="2" Content="{local:Loc BackupTab_ImportJson}" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" Foreground="{DynamicResource TextSecondary}" BorderThickness="1" Padding="10,6" FontSize="11" Click="BtnImportJson_Click">
                                     <Button.Resources>
                                         <Style TargetType="{x:Type Border}">
                                             <Setter Property="CornerRadius" Value="6"/>
@@ -614,10 +626,10 @@
 
                         <!-- Tab 2: CSV/TXT Bulk Import -->
                         <StackPanel x:Name="PanelTabCsv" Visibility="Collapsed">
-                            <TextBlock Text="Nhập hàng loạt từ tệp tin CSV / TXT" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
-                            <TextBlock Text="Định dạng hỗ trợ:&#x0a;• otpauth://totp/Label?secret=KEY (Google Authenticator URI)&#x0a;• TênDịchVụ,Nhãn,KhóaBíMật (Ngăn cách bởi dấu phẩy, chấm phẩy hoặc tab)." FontSize="12" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,15"/>
+                            <TextBlock Text="{local:Loc Csv_Title}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                            <TextBlock Text="{local:Loc Csv_Formats}" FontSize="12" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,15"/>
                             
-                            <Button Content="Chọn File (.csv, .txt)" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="14,10" FontWeight="Medium" FontSize="13" Click="BtnImportCsvFile_Click">
+                            <Button Content="{local:Loc Csv_Button}" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="14,10" FontWeight="Medium" FontSize="13" Click="BtnImportCsvFile_Click">
                                 <Button.Resources>
                                     <Style TargetType="{x:Type Border}">
                                         <Setter Property="CornerRadius" Value="6"/>
@@ -628,14 +640,14 @@
 
                         <!-- Tab 3: Google Sheet Connection -->
                         <StackPanel x:Name="PanelTabSheet" Visibility="Collapsed">
-                            <TextBlock Text="Nhập từ liên kết CSV Google Sheet công khai" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,4"/>
+                            <TextBlock Text="{local:Loc Sheet_Title}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,4"/>
                             
                             <!-- Small Help link/instruction -->
                             <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,12">
-                                <Run Text="Hướng dẫn: Trên Google Sheet của bạn, chọn "/><Run FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Text="Tệp"/><Run Text=" -> "/><Run FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Text="Chia sẻ"/><Run Text=" -> "/><Run FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Text="Xuất bản lên web"/><Run Text=" -> Chọn định dạng "/><Run FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Text="CSV"/><Run Text=" -> Nhấn Xuất bản và sao chép liên kết dán vào ô dưới."/>
+                                <Run FontWeight="Bold" Foreground="{DynamicResource DangerRed}" Text="{local:Loc Sheet_Warning}"/><Run Text="{local:Loc Sheet_Guide1}"/><Run FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Text="{local:Loc Sheet_File}"/><Run Text=" -> "/><Run FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Text="{local:Loc Sheet_Share}"/><Run Text=" -> "/><Run FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Text="{local:Loc Sheet_Publish}"/><Run Text="{local:Loc Sheet_Guide2}"/><Run FontWeight="Bold" Foreground="{DynamicResource TextPrimary}" Text="CSV"/><Run Text="{local:Loc Sheet_Guide3}"/>
                             </TextBlock>
 
-                            <TextBlock Text="Đường dẫn Google Sheet CSV (URL):" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
+                            <TextBlock Text="{local:Loc Sheet_UrlLabel}" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,6"/>
                             <TextBox x:Name="InputSheetUrl" Padding="10,8" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource InputBg}" Foreground="{DynamicResource TextPrimary}" BorderThickness="1" Margin="0,0,0,14">
                                 <TextBox.Resources>
                                     <Style TargetType="{x:Type Border}">
@@ -644,7 +656,7 @@
                                 </TextBox.Resources>
                             </TextBox>
 
-                            <Button Content="Đồng bộ từ Google Sheet" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="14,10" FontWeight="Medium" FontSize="13" Click="BtnImportFromSheet_Click">
+                            <Button Content="{local:Loc Sheet_Button}" Background="{DynamicResource PrimaryBlue}" Foreground="White" BorderThickness="0" Padding="14,10" FontWeight="Medium" FontSize="13" Click="BtnImportFromSheet_Click">
                                 <Button.Resources>
                                     <Style TargetType="{x:Type Border}">
                                         <Setter Property="CornerRadius" Value="6"/>
@@ -661,7 +673,7 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
                             
-                            <TextBlock Grid.Row="0" Text="Khôi phục tài khoản đã xóa" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
+                            <TextBlock Grid.Row="0" Text="{local:Loc Trash_Title}" FontSize="13" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8"/>
                             
                             <ListBox Grid.Row="1" x:Name="TrashList" Height="140" Background="{DynamicResource InputBg}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" ScrollViewer.VerticalScrollBarVisibility="Auto" Margin="0,0,0,10">
                                 <ListBox.ItemContainerStyle>
@@ -693,11 +705,11 @@
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                                 <!-- Restore Button -->
-                                                <Button Background="Transparent" BorderThickness="0" Click="BtnRestoreTrash_Click" Tag="{Binding}" Width="28" Height="28" Margin="0,0,6,0" ToolTip="Khôi phục tài khoản">
+                                                <Button Background="Transparent" BorderThickness="0" Click="BtnRestoreTrash_Click" Tag="{Binding}" Width="28" Height="28" Margin="0,0,6,0" ToolTip="{local:Loc Trash_Restore}">
                                                     <TextBlock Text="&#xE7A7;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{DynamicResource PrimaryBlue}"/>
                                                 </Button>
                                                 <!-- Permanently Delete Button -->
-                                                <Button Background="Transparent" BorderThickness="0" Click="BtnDeleteTrashPermanent_Click" Tag="{Binding}" Width="28" Height="28" ToolTip="Xóa vĩnh viễn">
+                                                <Button Background="Transparent" BorderThickness="0" Click="BtnDeleteTrashPermanent_Click" Tag="{Binding}" Width="28" Height="28" ToolTip="{local:Loc Trash_DeleteForever}">
                                                     <TextBlock Text="&#xE74D;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{DynamicResource DangerRed}"/>
                                                 </Button>
                                             </StackPanel>
@@ -711,8 +723,8 @@
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="* Các tài khoản đã xóa có thể được khôi phục tại đây." FontSize="11" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" Content="Dọn thùng rác" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Foreground="{DynamicResource DangerRed}" Padding="10,6" FontSize="11" Click="BtnEmptyTrash_Click">
+                                <TextBlock Text="{local:Loc Trash_Hint}" FontSize="11" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="{local:Loc Trash_EmptyButton}" Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Foreground="{DynamicResource DangerRed}" Padding="10,6" FontSize="11" Click="BtnEmptyTrash_Click">
                                     <Button.Resources>
                                         <Style TargetType="{x:Type Border}">
                                             <Setter Property="CornerRadius" Value="6"/>
@@ -747,7 +759,7 @@
 
                     <!-- Header -->
                     <Grid Grid.Row="0" Margin="0,0,0,16">
-                        <TextBlock Text="Thông tin ứng dụng" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
+                        <TextBlock Text="{local:Loc About_Title}" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimary}"/>
                         <Button x:Name="BtnCloseAbout" Background="Transparent" BorderThickness="0" HorizontalAlignment="Right" Click="BtnCloseAbout_Click">
                             <TextBlock Text="&#xE10A;" FontFamily="Segoe MDL2 Assets" FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
                         </Button>
@@ -755,25 +767,35 @@
 
                     <!-- Dev Info -->
                     <StackPanel Grid.Row="1" Margin="0,0,0,14">
-                        <TextBlock Text="Nhà phát triển:" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{local:Loc About_Developer}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,4"/>
                         <TextBlock Text="Nguyen Quoc Anh" FontSize="14" FontWeight="Medium" Foreground="{DynamicResource TextPrimary}"/>
-                        <TextBlock Text="Phiên bản: 1.0.0 (Desktop Standard)" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,2,0,0"/>
+                        <TextBlock Text="{local:Loc About_Version}" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,2,0,0"/>
                     </StackPanel>
 
                     <!-- Security Info & Backup link -->
                     <StackPanel Grid.Row="2" Margin="0,0,0,14">
-                        <TextBlock Text="Công nghệ bảo mật:" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="Mã hóa bảo mật PBKDF2 + AES-256" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimary}"/>
-                        <TextBlock Text="Dữ liệu khóa bí mật được mã hóa hoàn toàn cục bộ và chỉ có thể giải mã khi bạn nhập đúng mật khẩu Master." FontSize="12" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
-                        <CheckBox x:Name="ChkWindowsHello" Content="Mở khóa bằng Windows Hello (FaceID / Vân tay)" Checked="ChkWindowsHello_Checked" Unchecked="ChkWindowsHello_Unchecked" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,8,0,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{local:Loc About_Security}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{local:Loc About_Crypto}" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource TextPrimary}"/>
+                        <TextBlock Text="{local:Loc About_CryptoHint}" FontSize="12" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                        <CheckBox x:Name="ChkWindowsHello" Content="{local:Loc About_Hello}" Checked="ChkWindowsHello_Checked" Unchecked="ChkWindowsHello_Unchecked" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,8,0,0" VerticalAlignment="Center"/>
+
+                        <!-- Language -->
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <TextBlock Text="{local:Loc About_Language}" FontSize="12" Foreground="{DynamicResource TextSecondary}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox x:Name="LanguageBox" Width="130" SelectionChanged="LanguageBox_SelectionChanged" AutomationProperties.Name="Ngôn ngữ / Language">
+                                <ComboBoxItem Content="Tiếng Việt" Tag="vi"/>
+                                <ComboBoxItem Content="English" Tag="en"/>
+                            </ComboBox>
+                        </StackPanel>
                     </StackPanel>
 
                     <!-- Policy & License -->
                     <StackPanel Grid.Row="3" Margin="0,0,0,16">
-                        <TextBlock Text="Chính sách bảo mật &amp; Bản quyền:" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,4"/>
-                        <TextBlock Text="• Dữ liệu được lưu trữ hoàn toàn cục bộ (100% Offline)." FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,2"/>
-                        <TextBlock Text="• Không thu thập, không truyền tải bất kỳ thông tin nào ra ngoài." FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,2"/>
-                        <TextBlock Text="• Giấy phép: Bản quyền thuộc về Nguyen Quoc Anh (Personal Use)." FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
+                        <TextBlock Text="{local:Loc About_Policy}" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,4"/>
+                        <TextBlock Text="{local:Loc About_Policy1}" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,2"/>
+                        <TextBlock Text="{local:Loc About_Policy2}" FontSize="12" Foreground="{DynamicResource TextSecondary}" Margin="0,0,0,2"/>
+                        <TextBlock Text="{local:Loc About_Policy3}" FontSize="12" Foreground="{DynamicResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                        <TextBlock Text="{local:Loc About_License}" FontSize="12" Foreground="{DynamicResource TextSecondary}"/>
                     </StackPanel>
 
                     <!-- Footer Copyright -->
@@ -785,5 +807,10 @@
         </Grid>
 
     </Grid>
+
+        <!-- Non-blocking status toast (copy, delete, restore...) -->
+        <Border x:Name="ToastBorder" Visibility="Collapsed" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,24" Padding="16,10" CornerRadius="8" Background="#E6202124" IsHitTestVisible="False">
+            <TextBlock x:Name="ToastText" Foreground="White" FontSize="13" TextWrapping="Wrap" MaxWidth="480" AutomationProperties.LiveSetting="Polite"/>
+        </Border>
     </Grid>
 </Window>

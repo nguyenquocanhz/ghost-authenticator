@@ -67,16 +67,16 @@
           <p>In strict compliance with <strong>Microsoft Store Policy 10.5.4</strong> (Security of Personal Information):</p>
           <ul>
             <li>All saved authenticator accounts and secret keys are encrypted at rest using <strong>AES-256 (Advanced Encryption Standard in GCM mode)</strong> combined with <strong>PBKDF2 key derivation (SHA-256 with 100,000 rounds)</strong>.</li>
-            <li>Data is stored locally in your private Windows user profile directory (e.g., <code>%APPDATA%\GhostAuthenticator</code> or isolated MSIX package storage).</li>
+            <li>Data is stored locally in your private Windows user profile directory (e.g., <code>%LOCALAPPDATA%\GhostAuthenticator</code> or isolated MSIX package storage). Uninstalling the app removes this data, so keep an encrypted <code>.ghostbak</code> backup.</li>
             <li>No cloud synchronization or unencrypted remote backups take place unless you explicitly export an encrypted backup file to a destination of your own choosing.</li>
           </ul>
 
           <h2>3. Device Capabilities & Permissions</h2>
           <p>Ghost Authenticator requests only the minimal system capabilities necessary for its core utility:</p>
           <ul>
-            <li><strong>Camera / Webcam (Optional):</strong> If you choose to scan a physical 2FA QR code with your webcam, video frames are decoded in memory exclusively by the open-source ZXing engine. Video feeds or snapshots are never recorded, saved to disk, or transmitted over the network.</li>
-            <li><strong>Screen Capture / Drag & Drop (Optional):</strong> Used only to extract QR code data from an image file or selected screen coordinate that you explicitly provide.</li>
-            <li><strong>Network Capabilities:</strong> Ghost Authenticator operates completely offline. The application does not contain background analytics, advertising trackers, or external crash-reporting SDKs.</li>
+            <li><strong>Screen Capture / Drag & Drop (Optional):</strong> Used only when you click "Scan screen QR" or provide an image file. The capture is decoded in memory by the open-source ZXing engine and is never saved to disk or transmitted.</li>
+            <li><strong>Windows Hello (Optional):</strong> If you enable it, the vault key is wrapped by a Windows Hello key held by Windows (TPM-backed where available). Biometric data never reaches the app.</li>
+            <li><strong>Network Capabilities:</strong> Ghost Authenticator works offline and makes no network connections on its own. The only exception is the optional "Import from Google Sheet" feature: when you paste an HTTPS link and confirm, the app downloads that CSV file once to import accounts. Nothing is uploaded. The application does not contain background analytics, advertising trackers, or external crash-reporting SDKs.</li>
           </ul>
 
           <h2>4. Third-Party Sharing and Disclosures</h2>

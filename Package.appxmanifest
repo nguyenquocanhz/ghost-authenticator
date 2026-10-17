@@ -6,13 +6,13 @@
   IgnorableNamespaces="uap rescap">
 
   <Identity
-    Name="NQATech.GhostAuthenticator"
-    Publisher="CN=NQATech"
+    Name="WrenSpec.WrenSpec"
+    Publisher="CN=FEAF822E-6E4B-4B1F-8BA4-9D7432CA69D5"
     Version="1.0.0.0" />
 
   <Properties>
     <DisplayName>Ghost Authenticator</DisplayName>
-    <PublisherDisplayName>NQATech</PublisherDisplayName>
+    <PublisherDisplayName>WrenSpec</PublisherDisplayName>
     <Logo>Images\StoreLogo.scale-100.png</Logo>
     <Description>Next-Generation, Offline-First 2FA / TOTP Desktop Client for Windows. Military-grade AES-256 + PBKDF2 encryption. Zero telemetry. 100% offline.</Description>
   </Properties>
@@ -23,6 +23,7 @@
 
   <Resources>
     <Resource Language="en-us"/>
+    <Resource Language="vi-vn"/>
   </Resources>
 
   <Applications>

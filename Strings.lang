@@ -1,0 +1,236 @@
+# Ghost Authenticator UI strings.
+# Format: kind‖key‖Vietnamese‖English   (kind: s = plain text, f = format string with {0}, {1}...)
+# "\n" means a line break. Keep trailing spaces: they are part of the text.
+s‖Welcome_Title‖Chào mừng tới Ghost Authenticator‖Welcome to Ghost Authenticator
+s‖Welcome_Subtitle‖Vui lòng chọn khởi tạo kho bảo mật mới hoặc khôi phục dữ liệu 2FA của bạn.‖Create a new secure vault or restore your existing 2FA data.
+s‖Welcome_CreateTitle‖Tạo Kho Mới (Create New Vault)‖Create New Vault
+s‖Welcome_CreateHint‖Thiết lập mật khẩu chính mới cho ứng dụng‖Set a new master password for the app
+s‖Welcome_RestoreTitle‖Khôi Phục Dữ Liệu (Restore Backup)‖Restore Backup
+s‖Welcome_RestoreHint‖Phục hồi từ file .ghostbak, JSON hoặc CSV cũ‖Restore from a .ghostbak, JSON or CSV file
+s‖Setup_Title‖Thiết lập mật khẩu chính‖Set up master password
+s‖Setup_Subtitle‖Mật khẩu chính dùng để bảo mật và mã hóa toàn bộ dữ liệu 2FA của bạn.‖Your master password protects and encrypts all of your 2FA data.
+s‖Setup_NewPassword‖Mật khẩu mới (Master Password)‖New master password
+s‖Setup_Confirm‖Xác nhận mật khẩu‖Confirm password
+s‖Setup_Button‖Thiết lập mật khẩu‖Set password
+s‖Unlock_Title‖Mở khóa ứng dụng‖Unlock app
+s‖Unlock_Subtitle‖Nhập mật khẩu chính để giải mã danh sách tài khoản 2FA.‖Enter your master password to decrypt your 2FA accounts.
+s‖Unlock_PasswordLabel‖Mật khẩu chính (Master Password)‖Master password
+s‖Unlock_Hello‖Mở khóa bằng Windows Hello‖Unlock with Windows Hello
+s‖Unlock_Button‖Mở khóa‖Unlock
+s‖Search_Placeholder‖Tìm kiếm...‖Search...
+s‖Add_Manual‖Thêm thủ công‖Add manually
+s‖QuickQr_Tooltip‖Quét mã QR trực tiếp từ màn hình‖Scan a QR code directly from your screen
+s‖QuickQr_Button‖Quét QR Màn Hình‖Scan Screen QR
+s‖Lock_Tooltip‖Khóa ứng dụng (Ctrl+L)‖Lock app (Ctrl+L)
+s‖Lock_Name‖Khóa ứng dụng‖Lock app
+s‖Backup_Tooltip‖Sao lưu / Nhập dữ liệu‖Backup / Import
+s‖Backup_Name‖Sao lưu và nhập dữ liệu‖Backup and import
+s‖Theme_Tooltip‖Giao diện Sáng/Tối‖Light/Dark theme
+s‖Theme_Name‖Đổi giao diện sáng tối‖Toggle light or dark theme
+s‖About_Title‖Thông tin ứng dụng‖About
+s‖Row_CopyTooltip‖Sao chép OTP‖Copy OTP
+s‖Row_CopyName‖Sao chép mã OTP‖Copy OTP code
+s‖Row_ViewTooltip‖Xem Khóa Bí Mật (Secret Key)‖View secret key
+s‖Row_ViewName‖Xem khóa bí mật‖View secret key
+s‖Row_Delete‖Xóa tài khoản‖Delete account
+s‖Empty_NoAccounts‖Chưa có tài khoản 2FA nào được lưu.‖No 2FA accounts saved yet.
+s‖Empty_NoAccountsHint‖Nhấn "Thêm thủ công" hoặc "Quét QR Màn Hình" ở trên để thêm tài khoản.‖Click "Add manually" or "Scan Screen QR" above to add an account.
+s‖AddModal_Title‖Thêm tài khoản 2FA‖Add 2FA account
+s‖AddModal_QuickQr‖🖼️ Thêm nhanh từ Mã QR Code‖🖼️ Quick add from a QR code
+s‖AddModal_ScanScreen‖📷 Quét màn hình‖📷 Scan screen
+s‖AddModal_PickImage‖🖼️ Chọn ảnh QR‖🖼️ Choose QR image
+s‖AddModal_Issuer‖Tên dịch vụ (ví dụ: Google, HostViet)‖Service name (e.g. Google, GitHub)
+s‖AddModal_Label‖Tên tài khoản (Email, nhãn)‖Account name (email, label)
+s‖AddModal_Secret‖Khóa bí mật của bạn (Secret Key)‖Your secret key
+s‖Backup_Title‖Sao lưu & Nhập dữ liệu hàng loạt‖Backup & bulk import
+s‖Tab_Qr‖Quét Mã QR‖Scan QR
+s‖Tab_Backup‖Sao lưu‖Backup
+s‖Tab_Trash‖Thùng rác‖Trash
+s‖Qr_Title‖Nhập tài khoản 2FA bằng Mã QR (QR Code Scanner)‖Import 2FA accounts from a QR code
+s‖Qr_Subtitle‖Quét trực tiếp mã QR 2FA đang hiển thị trên màn hình máy tính hoặc tải lên file ảnh mã QR.‖Scan a 2FA QR code shown on your screen, or load it from an image file.
+s‖Qr_ScreenTitle‖📷 Quét mã QR trực tiếp trên màn hình‖📷 Scan a QR code on your screen
+s‖Qr_ScreenHint‖Tự động chụp màn hình và trích xuất khóa 2FA từ trang web (Facebook, Google, Discord...)‖Captures your screen and extracts the 2FA key from the page (Facebook, Google, Discord...)
+s‖Qr_ScreenButton‖Quét QR trên màn hình‖Scan QR on screen
+s‖Qr_FileTitle‖🖼️ Nhập mã QR từ File Ảnh‖🖼️ Import a QR code from an image
+s‖Qr_FileHint‖Chọn tệp tin hình ảnh (.png, .jpg, .jpeg, .bmp) chứa mã QR 2FA‖Choose an image file (.png, .jpg, .jpeg, .bmp) that contains a 2FA QR code
+s‖Qr_FileButton‖Chọn file ảnh QR‖Choose QR image file
+s‖BackupTab_Title‖Sao lưu an toàn (Encrypted .ghostbak & JSON)‖Secure backup (encrypted .ghostbak & JSON)
+s‖BackupTab_Hint‖Khuyến nghị: Xuất file sao lưu mã hóa (.ghostbak) được bảo vệ bằng mật khẩu để chống lộ mã 2FA khi lưu trữ trên Cloud/USB.‖Recommended: export a password-protected .ghostbak backup so your 2FA keys stay safe on cloud storage or USB drives.
+s‖BackupTab_Encrypted‖🔒 Sao lưu mã hóa (.ghostbak)‖🔒 Encrypted backup (.ghostbak)
+s‖BackupTab_Export‖Xuất file .ghostbak‖Export .ghostbak
+s‖BackupTab_Import‖Nhập file .ghostbak‖Import .ghostbak
+s‖BackupTab_ExportJson‖Xuất JSON (Bản rõ)‖Export JSON (plain text)
+s‖BackupTab_JsonWarning‖Cảnh báo: Bản rõ JSON không mã hóa!‖Warning: plain JSON is not encrypted!
+s‖BackupTab_ImportJson‖Nhập JSON (Bản rõ)‖Import JSON (plain text)
+s‖Csv_Title‖Nhập hàng loạt từ tệp tin CSV / TXT‖Bulk import from a CSV / TXT file
+s‖Csv_Formats‖Định dạng hỗ trợ:\n• otpauth://totp/Label?secret=KEY (Google Authenticator URI)\n• TênDịchVụ,Nhãn,KhóaBíMật (Ngăn cách bởi dấu phẩy, chấm phẩy hoặc tab).‖Supported formats:\n• otpauth://totp/Label?secret=KEY (Google Authenticator URI)\n• Service,Label,SecretKey (separated by comma, semicolon or tab).
+s‖Csv_Button‖Chọn File (.csv, .txt)‖Choose file (.csv, .txt)
+s‖Sheet_Title‖Nhập từ liên kết CSV Google Sheet công khai‖Import from a published Google Sheet CSV link
+s‖Sheet_Warning‖Lưu ý: liên kết xuất bản là công khai, hãy dừng xuất bản ngay sau khi nhập. ‖Note: published links are public. Stop publishing right after importing.
+s‖Sheet_Guide1‖Hướng dẫn: Trên Google Sheet của bạn, chọn ‖How to: in your Google Sheet, choose
+s‖Sheet_File‖Tệp‖File
+s‖Sheet_Share‖Chia sẻ‖Share
+s‖Sheet_Publish‖Xuất bản lên web‖Publish to web
+s‖Sheet_Guide2‖ -> Chọn định dạng ‖ -> choose format
+s‖Sheet_Guide3‖ -> Nhấn Xuất bản và sao chép liên kết dán vào ô dưới.‖ -> click Publish, then paste the link below.
+s‖Sheet_UrlLabel‖Đường dẫn Google Sheet CSV (URL):‖Google Sheet CSV link (URL):
+s‖Sheet_Button‖Đồng bộ từ Google Sheet‖Import from Google Sheet
+s‖Trash_Title‖Khôi phục tài khoản đã xóa‖Restore deleted accounts
+s‖Trash_Restore‖Khôi phục tài khoản‖Restore account
+s‖Trash_DeleteForever‖Xóa vĩnh viễn‖Delete permanently
+s‖Trash_Hint‖* Các tài khoản đã xóa có thể được khôi phục tại đây.‖* Deleted accounts can be restored here.
+s‖Trash_EmptyButton‖Dọn thùng rác‖Empty trash
+s‖About_Developer‖Nhà phát triển:‖Developer:
+s‖About_Version‖Phiên bản: 1.0.0 (Desktop Standard)‖Version: 1.0.0 (Desktop Standard)
+s‖About_Security‖Công nghệ bảo mật:‖Security:
+s‖About_Crypto‖Mã hóa bảo mật PBKDF2 + AES-256-GCM‖PBKDF2 + AES-256-GCM encryption
+s‖About_CryptoHint‖Dữ liệu khóa bí mật được mã hóa hoàn toàn cục bộ và chỉ có thể giải mã khi bạn nhập đúng mật khẩu Master. Ứng dụng tự khóa khi bạn khóa Windows hoặc sau 5 phút không thao tác.‖Secret keys are encrypted locally and can only be decrypted with your master password. The app locks itself when you lock Windows or after 5 minutes of inactivity.
+s‖About_Hello‖Mở khóa bằng Windows Hello (khuôn mặt / vân tay / mã PIN)‖Unlock with Windows Hello (face / fingerprint / PIN)
+s‖About_Policy‖Chính sách bảo mật & Bản quyền:‖Privacy & license:
+s‖About_Policy1‖• Dữ liệu được lưu trữ hoàn toàn cục bộ (100% Offline).‖• All data is stored locally on this device.
+s‖About_Policy2‖• Không thu thập, không truyền tải bất kỳ thông tin nào ra ngoài.‖• No data is collected or sent anywhere.
+s‖About_Policy3‖• Kết nối mạng duy nhất: tải file CSV khi bạn tự dùng tính năng nhập từ Google Sheet.‖• The only network access is downloading a CSV file when you use Google Sheet import.
+s‖About_License‖• Giấy phép: Bản quyền thuộc về Nguyen Quoc Anh (Personal Use).‖• License: Copyright Nguyen Quoc Anh (personal use).
+s‖About_Language‖Ngôn ngữ / Language‖Ngôn ngữ / Language
+s‖Restore_DialogTitle‖Chọn file sao lưu để khôi phục (Encrypted .ghostbak, JSON hoặc CSV)‖Choose a backup to restore (encrypted .ghostbak, JSON or CSV)
+s‖Restore_Filter‖Tệp sao lưu 2FA (*.ghostbak;*.json;*.csv;*.txt)|*.ghostbak;*.json;*.csv;*.txt|GhostBak Encrypted (*.ghostbak)|*.ghostbak|JSON Backup (*.json)|*.json|CSV/TXT (*.csv;*.txt)|*.csv;*.txt‖2FA backup files (*.ghostbak;*.json;*.csv;*.txt)|*.ghostbak;*.json;*.csv;*.txt|GhostBak Encrypted (*.ghostbak)|*.ghostbak|JSON Backup (*.json)|*.json|CSV/TXT (*.csv;*.txt)|*.csv;*.txt
+s‖Restore_GhostbakTitle‖Khôi Phục Bản Sao Lưu Encrypted .ghostbak‖Restore encrypted .ghostbak backup
+s‖Restore_GhostbakPrompt‖Nhập mật khẩu đã dùng để bảo vệ file sao lưu .ghostbak này.\n(Mật khẩu này cũng sẽ được thiết lập làm Mật Khẩu Chính cho ứng dụng.)‖Enter the password that protects this .ghostbak file.\n(It will also become the app's master password.)
+s‖Restore_NoAccounts‖File sao lưu không chứa tài khoản hợp lệ nào.‖The backup file contains no valid accounts.
+s‖Title_DataError‖Lỗi dữ liệu‖Data error
+f‖Restore_GhostbakDone‖Khôi phục thành công {0} tài khoản từ bản sao lưu .ghostbak!\nMật khẩu chính của ứng dụng đã được thiết lập theo mật khẩu file sao lưu.‖Restored {0} accounts from the .ghostbak backup.\nThe app's master password is now the backup password.
+s‖Title_RestoreDone‖Khôi phục hoàn tất‖Restore complete
+s‖Restore_DecryptFailed‖Giải mã file sao lưu thất bại. Mật khẩu không đúng hoặc file bị hư hỏng.‖Could not decrypt the backup. The password is wrong or the file is damaged.
+s‖Title_DecryptError‖Lỗi giải mã‖Decryption error
+s‖Restore_Failed‖Khôi phục thất bại: ‖Restore failed:
+s‖Title_RestoreError‖Lỗi khôi phục‖Restore error
+s‖Restore_PlainTitle‖Thiết Lập Mật Khẩu Chính Khôi Phục‖Set master password
+s‖Restore_PlainPrompt‖Tệp sao lưu này là bản rõ (JSON/CSV). Vui lòng đặt Mật Khẩu Chính (Master Password) mới để bảo vệ ứng dụng:‖This backup is plain text (JSON/CSV). Set a new master password to protect the app:
+s‖Restore_NoValidData‖Không tìm thấy dữ liệu tài khoản 2FA hợp lệ nào trong tệp tin.‖No valid 2FA accounts were found in the file.
+f‖Restore_PlainDone‖Khôi phục thành công {0} tài khoản 2FA và khởi tạo kho bảo mật thành công!\nHãy xóa file bản rõ JSON/CSV sau khi khôi phục để tránh lộ khóa 2FA.‖Restored {0} 2FA accounts and created your secure vault.\nDelete the plain JSON/CSV file now so your 2FA keys are not exposed.
+s‖Restore_ReadFailed‖Đọc file sao lưu thất bại: ‖Could not read the backup file:
+s‖Title_FileReadError‖Lỗi đọc tệp‖File read error
+s‖Setup_Missing‖Vui lòng nhập mật khẩu và xác nhận mật khẩu.‖Enter and confirm your password.
+s‖Setup_TooShort‖Mật khẩu chính phải có độ dài tối thiểu 8 ký tự để đảm bảo an toàn.‖The master password must be at least 8 characters long.
+s‖Title_SecurityRequirement‖Yêu cầu bảo mật‖Security requirement
+s‖Setup_Mismatch‖Mật khẩu xác nhận không trùng khớp.‖The passwords do not match.
+s‖Title_PasswordMismatch‖Mật khẩu không khớp‖Passwords do not match
+s‖Setup_Done‖Thiết lập mật khẩu chính thành công. Dữ liệu được mã hóa bằng AES-256.‖Master password set. Your data is encrypted with AES-256.
+s‖Setup_Failed‖Có lỗi xảy ra khi thiết lập mật khẩu: ‖Could not set the password:
+s‖Title_SecurityError‖Lỗi bảo mật‖Security error
+f‖Unlock_Throttled‖Bạn đã nhập sai mật khẩu nhiều lần. Vui lòng thử lại sau {0} giây.‖Too many wrong passwords. Try again in {0} seconds.
+s‖Title_UnlockPaused‖Tạm khóa mở khóa‖Unlock paused
+s‖Unlock_Empty‖Vui lòng nhập mật khẩu để mở khóa.‖Enter your password to unlock.
+s‖Unlock_NoSecurityFile‖Không tìm thấy tệp bảo mật. Vui lòng khởi động lại ứng dụng.‖Security file not found. Please restart the app.
+s‖Title_SystemError‖Lỗi hệ thống‖System error
+s‖Unlock_SecurityCorrupt‖Tệp bảo mật bị hỏng. Vui lòng khôi phục từ bản sao lưu .ghostbak.‖The security file is damaged. Restore from a .ghostbak backup.
+s‖Title_FileError‖Lỗi tệp‖File error
+s‖Unlock_WrongPassword‖Mật khẩu chính không chính xác. Vui lòng thử lại.‖Wrong master password. Please try again.
+s‖Title_UnlockFailed‖Mở khóa thất bại‖Unlock failed
+s‖Hello_Upgraded‖Mở khóa bằng Windows Hello đã được nâng cấp lên chuẩn bảo mật mới (khóa lưu trong TPM).\nVui lòng bật lại Windows Hello trong mục Thông tin ứng dụng.‖Windows Hello unlock was upgraded to a stronger method (key kept in the TPM).\nPlease turn Windows Hello on again under About.
+s‖Title_SecurityUpgrade‖Nâng cấp bảo mật‖Security upgrade
+s‖Pin_InvalidKey‖SAI KHÓA‖BAD KEY
+s‖Store_AccountList‖danh sách tài khoản‖the account list
+s‖Store_Trash‖thùng rác‖the trash
+s‖Store_ReadFailed‖Không thể đọc dữ liệu đã mã hóa. Ứng dụng sẽ khóa lại để tránh ghi đè dữ liệu.\nChi tiết: ‖Could not read the encrypted data. The app will lock to avoid overwriting it.\nDetails:
+s‖Title_StorageError‖Lỗi lưu trữ‖Storage error
+f‖Store_Corrupt‖Không thể giải mã {0} (tệp bị hỏng hoặc bị chỉnh sửa).\nTệp gốc đã được giữ lại tại:\n{1}\n\nBạn có thể khôi phục từ bản sao lưu .ghostbak.‖Could not decrypt {0} (the file is damaged or was modified).\nThe original file was kept at:\n{1}\n\nYou can restore from a .ghostbak backup.
+s‖Store_SaveFailed‖Không thể mã hóa cơ sở dữ liệu.‖Could not encrypt the database.
+s‖Store_SaveTrashFailed‖Không thể mã hóa danh sách đã xóa.‖Could not encrypt the trash.
+s‖Common_ErrorPrefix‖\nLỗi: ‖\nError:
+f‖Empty_NoMatch‖Không tìm thấy tài khoản khớp với "{0}".‖No accounts match "{0}".
+s‖Empty_NoMatchHint‖Thử từ khóa khác hoặc nhấn Esc để xóa tìm kiếm.‖Try another search or press Esc to clear it.
+s‖Add_MissingFields‖Vui lòng điền đầy đủ tất cả các trường.‖Please fill in all fields.
+s‖Title_InputData‖Nhập dữ liệu‖Input
+s‖Add_InvalidSecret‖Khóa bí mật Secret Key không hợp lệ (phải là định dạng Base32 chuẩn).‖The secret key is invalid (it must be Base32).
+s‖Title_FormatError‖Lỗi định dạng‖Format error
+s‖Add_Duplicate‖Khóa bí mật này đã tồn tại trong danh sách.‖This secret key is already in your list.
+s‖Title_Duplicate‖Trùng lặp‖Duplicate
+f‖Add_Done‖Đã thêm tài khoản {0}.‖Added {0}.
+s‖Copy_InvalidKey‖Khóa bí mật của tài khoản này không hợp lệ.‖This account's secret key is invalid.
+f‖Copy_Done‖Đã sao chép mã {0}. Tự xóa khỏi clipboard sau 30 giây.‖Copied the {0} code. It will be cleared from the clipboard in 30 seconds.
+s‖Copy_Busy‖Clipboard đang bị ứng dụng khác sử dụng. Vui lòng thử lại.‖Another app is using the clipboard. Please try again.
+f‖Delete_Confirm‖Bạn có chắc chắn muốn xóa tài khoản "{0} ({1})" không?\nTài khoản bị xóa sẽ được đưa vào Thùng rác và có thể khôi phục bất cứ lúc nào.‖Delete the account "{0} ({1})"?\nIt will be moved to the Trash and can be restored at any time.
+s‖Title_ConfirmDelete‖Xác nhận xóa‖Confirm delete
+f‖Delete_Done‖Đã chuyển "{0}" vào Thùng rác.‖Moved "{0}" to the Trash.
+f‖Secret_Reason‖xem khóa bí mật của {0}‖view the secret key of {0}
+f‖Secret_Show‖Khóa bí mật của tài khoản "{0} ({1})" là:\n\n{2}\n\nBạn có muốn sao chép khóa này vào clipboard không? (Tự xóa sau 30 giây)‖The secret key of "{0} ({1})" is:\n\n{2}\n\nCopy it to the clipboard? (Cleared after 30 seconds)
+s‖Secret_Copied‖Đã sao chép khóa bí mật. Tự xóa khỏi clipboard sau 30 giây.‖Secret key copied. It will be cleared from the clipboard in 30 seconds.
+s‖Verify_Title‖Xác thực danh tính‖Verify your identity
+f‖Verify_Prompt‖Nhập mật khẩu chính để {0}.‖Enter your master password to {0}.
+s‖Verify_WrongPassword‖Mật khẩu chính không chính xác.‖Wrong master password.
+s‖Title_VerifyFailed‖Xác thực thất bại‖Verification failed
+s‖Qr_ScanDone‖Quét mã QR thành công. Đã thêm tài khoản 2FA mới.‖QR code scanned. New 2FA account added.
+s‖Qr_NotFound‖Không tìm thấy mã QR 2FA hợp lệ trên màn hình.\nVui lòng đảm bảo mã QR (trên Facebook, Google, Discord...) đang hiển thị rõ trên màn hình máy tính.‖No valid 2FA QR code was found on screen.\nMake sure the QR code (from Facebook, Google, Discord...) is clearly visible.
+s‖Title_QrNotFound‖Không tìm thấy QR‖QR code not found
+s‖Qr_ScanFailed‖Có lỗi xảy ra khi chụp và quét màn hình: ‖Screen capture failed:
+s‖Title_QrError‖Lỗi quét QR‖QR scan error
+s‖Qr_PickTitle‖Chọn file ảnh chứa Mã QR 2FA‖Choose an image with a 2FA QR code
+s‖Qr_ImageFilter‖Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp;*.webp)|*.png;*.jpg;*.jpeg;*.bmp;*.webp‖Image files (*.png;*.jpg;*.jpeg;*.bmp;*.webp)|*.png;*.jpg;*.jpeg;*.bmp;*.webp
+s‖Qr_ImageDone‖Đọc mã QR thành công. Đã thêm tài khoản 2FA mới.‖QR code read. New 2FA account added.
+s‖Qr_ImageInvalid‖Không thể trích xuất thông tin 2FA từ hình ảnh này.\nVui lòng đảm bảo hình ảnh rõ nét và chứa mã QR chuẩn 2FA (otpauth://).‖Could not read 2FA data from this image.\nMake sure it is sharp and contains a standard 2FA QR code (otpauth://).
+s‖Title_QrCodeError‖Lỗi mã QR‖QR code error
+s‖Qr_ImageReadFailed‖Đọc tệp hình ảnh thất bại: ‖Could not read the image:
+s‖Title_FileErrorShort‖Lỗi file‖File error
+f‖Drop_Done‖Đã nhập {0} tài khoản 2FA từ hình ảnh.‖Imported {0} 2FA accounts from images.
+s‖Drop_None‖Không trích xuất được tài khoản 2FA nào từ hình ảnh đã thả vào ứng dụng.\nVui lòng đảm bảo hình ảnh chứa mã QR chuẩn 2FA (otpauth://).‖No 2FA accounts could be read from the dropped images.\nMake sure they contain a standard 2FA QR code (otpauth://).
+f‖Trash_Restored‖Đã khôi phục tài khoản "{0}".‖Restored "{0}".
+f‖Trash_ConfirmDelete‖Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản "{0} ({1})" không?\nHành động này không thể hoàn tác!‖Permanently delete "{0} ({1})"?\nThis cannot be undone!
+s‖Title_ConfirmDeleteForever‖Xác nhận xóa vĩnh viễn‖Confirm permanent delete
+s‖Trash_Deleted‖Đã xóa tài khoản vĩnh viễn.‖Account permanently deleted.
+s‖Trash_IsEmpty‖Thùng rác hiện đang trống.‖The trash is empty.
+s‖Trash_ConfirmEmpty‖Bạn có chắc chắn muốn xóa vĩnh viễn toàn bộ tài khoản trong Thùng rác không?\nHành động này không thể hoàn tác!‖Permanently delete everything in the Trash?\nThis cannot be undone!
+s‖Title_EmptyTrash‖Dọn sạch thùng rác‖Empty trash
+s‖Trash_Emptied‖Thùng rác đã được dọn sạch.‖The trash has been emptied.
+s‖Backup_NoAccounts‖Không có tài khoản nào để sao lưu.‖There are no accounts to back up.
+s‖Export_PasswordTitle‖Mật Khẩu Sao Lưu Encrypted .ghostbak‖Backup password (.ghostbak)
+s‖Export_PasswordPrompt‖Đặt mật khẩu bảo vệ file sao lưu (bạn sẽ cần mật khẩu này để giải mã khi khôi phục):‖Set a password for the backup file (you will need it to restore):
+s‖Export_Done‖Đã xuất file sao lưu mã hóa .ghostbak.‖Encrypted .ghostbak backup exported.
+s‖Export_Failed‖Có lỗi xảy ra khi tạo file sao lưu: ‖Could not create the backup:
+s‖Title_BackupError‖Lỗi sao lưu‖Backup error
+s‖Import_PasswordTitle‖Giải Mã File Sao Lưu‖Decrypt backup
+s‖Import_PasswordPrompt‖Nhập mật khẩu đã dùng để khóa file sao lưu .ghostbak này:‖Enter the password of this .ghostbak backup:
+s‖Import_NoData‖File giải mã không chứa dữ liệu tài khoản hợp lệ.‖The decrypted file contains no account data.
+f‖Import_GhostbakDone‖Đã nhập {0} tài khoản 2FA từ file sao lưu mã hóa.‖Imported {0} 2FA accounts from the encrypted backup.
+s‖Import_NothingNew‖Không tìm thấy tài khoản mới nào hợp lệ (hoặc tất cả tài khoản đã tồn tại).‖No new valid accounts found (they may already exist).
+s‖Title_Info‖Thông báo‖Information
+s‖Import_DecryptFailed‖Giải mã file sao lưu thất bại. Mật khẩu không đúng hoặc file đã bị hư hỏng/chỉnh sửa.‖Could not decrypt the backup. The password is wrong or the file was damaged or modified.
+s‖Json_ExportWarning‖File JSON bản rõ KHÔNG được mã hóa: ai có file này đều đọc được toàn bộ khóa 2FA của bạn.\n\nNên dùng "Xuất file .ghostbak" để sao lưu an toàn. Vẫn tiếp tục xuất JSON?‖A plain JSON file is NOT encrypted: anyone with the file can read all of your 2FA keys.\n\nUse "Export .ghostbak" for a safe backup. Export JSON anyway?
+s‖Title_SecurityWarning‖Cảnh báo bảo mật‖Security warning
+s‖Json_ExportDone‖Đã xuất file sao lưu JSON.‖JSON backup exported.
+s‖Json_WriteFailed‖Có lỗi xảy ra khi ghi file: ‖Could not write the file:
+s‖Title_Error‖Lỗi‖Error
+s‖Json_InvalidFormat‖File không đúng định dạng.‖The file format is invalid.
+f‖Json_ImportDone‖Đã nhập {0} tài khoản mới.‖Imported {0} new accounts.
+s‖Json_NothingNew‖Không tìm thấy tài khoản mới nào hợp lệ để nhập vào (hoặc tất cả đã trùng lặp).‖No new valid accounts to import (they may all be duplicates).
+s‖Json_ImportFailed‖Nhập sao lưu thất bại. Định dạng file JSON không hợp lệ.\nChi tiết: ‖Import failed. The JSON file is invalid.\nDetails:
+f‖Csv_ImportDone‖Đã nhập hàng loạt {0} tài khoản mới.‖Bulk imported {0} new accounts.
+s‖Csv_NothingNew‖Không tìm thấy thông tin tài khoản 2FA hợp lệ mới nào trong tệp tin.‖No new valid 2FA accounts found in the file.
+s‖Csv_ReadFailed‖Đọc tệp tin thất bại. Lỗi: ‖Could not read the file. Error:
+s‖Sheet_UrlMissing‖Vui lòng nhập đường dẫn CSV xuất bản của Google Sheet.‖Enter the published CSV link of your Google Sheet.
+s‖Title_Sheet‖Nhập Google Sheet‖Google Sheet import
+s‖Sheet_HttpsOnly‖Chỉ hỗ trợ liên kết HTTPS.‖Only HTTPS links are supported.
+s‖Sheet_PublicWarning‖Liên kết "Xuất bản lên web" của Google Sheet là CÔNG KHAI: bất kỳ ai có liên kết đều đọc được khóa 2FA của bạn.\n\nSau khi nhập xong, hãy dừng xuất bản hoặc xóa trang tính đó.\n\nTiếp tục tải dữ liệu?‖A Google Sheet "Publish to web" link is PUBLIC: anyone with the link can read your 2FA keys.\n\nAfter importing, stop publishing or delete that sheet.\n\nContinue downloading?
+f‖Sheet_Done‖Đã thêm {0} tài khoản mới từ Google Sheet.\n\nHãy dừng xuất bản trang tính ngay bây giờ để khóa 2FA không còn công khai.‖Added {0} new accounts from Google Sheet.\n\nStop publishing the sheet now so your 2FA keys are no longer public.
+s‖Title_SyncDone‖Hoàn tất đồng bộ‖Import complete
+s‖Sheet_NothingNew‖Đã tải dữ liệu Google Sheet nhưng không tìm thấy thông tin tài khoản 2FA mới nào (hoặc đã bị trùng lặp).‖Downloaded the Google Sheet but found no new 2FA accounts (or they are duplicates).
+s‖Sheet_Failed‖Kết nối và tải dữ liệu từ Google Sheet thất bại.\nChi tiết: ‖Could not download the Google Sheet.\nDetails:
+s‖Title_SyncError‖Lỗi đồng bộ‖Import error
+s‖Hello_Unavailable‖Tính năng Windows Hello hiện không khả dụng trên thiết bị này. Vui lòng mở khóa bằng mật khẩu chính.‖Windows Hello is not available on this device. Unlock with your master password.
+s‖Hello_Failed‖Xác thực Windows Hello không thành công. Vui lòng thử lại hoặc dùng mật khẩu chính.‖Windows Hello verification failed. Try again or use your master password.
+s‖Hello_Stale‖Khóa Windows Hello không còn khớp với kho dữ liệu hiện tại và đã được gỡ bỏ.\nVui lòng mở khóa bằng mật khẩu chính rồi bật lại Windows Hello.‖The Windows Hello key no longer matches this vault and was removed.\nUnlock with your master password, then turn Windows Hello on again.
+s‖Hello_Error‖Có lỗi xảy ra khi xác thực bằng Windows Hello:\n‖Windows Hello error:\n
+s‖Title_AuthError‖Lỗi xác thực‖Authentication error
+s‖Hello_NotSupported‖Thiết bị của bạn không hỗ trợ hoặc chưa cấu hình Windows Hello (khuôn mặt / vân tay / mã PIN).\nVui lòng bật Windows Hello trong Windows Settings.‖This device does not support Windows Hello or it is not set up (face / fingerprint / PIN).\nTurn on Windows Hello in Windows Settings.
+s‖Title_NotSupported‖Không hỗ trợ‖Not supported
+s‖Hello_Cancelled‖Chưa bật Windows Hello (đã hủy xác thực).‖Windows Hello was not turned on (verification cancelled).
+s‖Hello_Enabled‖Đã bật mở khóa bằng Windows Hello.‖Windows Hello unlock turned on.
+s‖Hello_SetupFailed‖Lỗi thiết lập Windows Hello: ‖Windows Hello setup failed:
+s‖Hello_Disabled‖Đã tắt mở khóa bằng Windows Hello.‖Windows Hello unlock turned off.
+s‖Pwd_Retype‖Nhập lại mật khẩu‖Re-enter password
+s‖Pwd_Ok‖Đồng ý‖OK
+s‖Pwd_Cancel‖Hủy‖Cancel
+f‖Pwd_MinLength‖Mật khẩu phải có tối thiểu {0} ký tự.‖The password must be at least {0} characters.
+s‖Pwd_Empty‖Vui lòng nhập mật khẩu.‖Please enter a password.
+s‖Pwd_Mismatch‖Mật khẩu nhập lại không trùng khớp.‖The passwords do not match.
+s‖App_UnexpectedError‖Đã xảy ra lỗi không mong muốn:\n‖An unexpected error occurred:\n

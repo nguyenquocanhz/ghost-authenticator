@@ -73,7 +73,7 @@ Script sẽ tự động:
 1. `dotnet publish` project ở chế độ Release x64.
 2. Sao chép các binary và `AppxManifest.xml` vào staging.
 3. Tạo chỉ mục tài nguyên hiển thị DPI bằng `makepri.exe`.
-4. Đóng gói ra file: **`dist\GhostAuthenticator_1.0.0_x64.msix`** (~13 MB).
+4. Đóng gói ra file: **`dist\GhostAuthenticator_1.0.0_x64.msix`** (~84 MB, đã kèm .NET runtime nên máy người dùng không cần cài thêm).
 
 ---
 

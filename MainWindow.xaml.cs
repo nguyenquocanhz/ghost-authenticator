@@ -7,6 +7,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -21,27 +22,59 @@ namespace AuthenticatorDesktop
         private const string DataFileName = "accounts.dat";
         private const string SecurityFileName = "security.dat";
         private const string DeletedFileName = "deleted_accounts.dat";
+        private const string HelloFileName = "hello.dat";
+        // Version 1.0.0 stored the vault key under DPAPI only; any program running as the
+        // user could read it. It is removed on startup and Hello must be enabled again.
+        private const string LegacyBiometricFileName = "biometric.dat";
+        private const string SettingsFileName = "settings.json";
+
+        private static readonly byte[] AuthToken = Encoding.UTF8.GetBytes("AUTH-OK");
+        private static readonly TimeSpan ClipboardClearDelay = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan IdleLockTimeout = TimeSpan.FromMinutes(5);
+        private const int FreeUnlockAttempts = 5;
+
         private readonly string _dataPath;
         private readonly string _securityPath;
-        private readonly string _biometricPath;
+        private readonly string _helloPath;
         private readonly string _deletedPath;
+        private readonly string _settingsPath;
+        private readonly AppSettings _settings;
         private readonly DispatcherTimer _timer;
+        private readonly DispatcherTimer _toastTimer;
         private bool _isDarkMode = false;
         private List<Account> _allAccounts = new();
         private List<Account> _deletedAccounts = new();
         private byte[]? _derivedKey;
+        private DateTime _lastActivityUtc = DateTime.UtcNow;
+        private int _failedUnlockAttempts;
+        private DateTime _unlockBlockedUntilUtc = DateTime.MinValue;
+        private bool _isUnlocking;
+        private bool _suppressHelloToggle;
+        private bool _suppressLanguageChange;
+        private bool _helloResetNotice;
         public ObservableCollection<Account> DisplayAccounts { get; } = new();
 
         public MainWindow()
         {
             InitializeComponent();
-            _dataPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DataFileName);
-            _securityPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, SecurityFileName);
-            _biometricPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "biometric.dat");
-            _deletedPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DeletedFileName);
-            
+            string dataDir = GetDataDirectory();
+            _dataPath = Path.Combine(dataDir, DataFileName);
+            _securityPath = Path.Combine(dataDir, SecurityFileName);
+            _helloPath = Path.Combine(dataDir, HelloFileName);
+            _deletedPath = Path.Combine(dataDir, DeletedFileName);
+            _settingsPath = Path.Combine(dataDir, SettingsFileName);
+
+            _settings = AppSettings.Load(_settingsPath);
+            ApplyTheme(_settings.DarkMode ?? AppSettings.SystemPrefersDark());
+
+            _helloResetNotice = RemoveLegacyBiometricKey(dataDir);
+
+            _suppressLanguageChange = true;
+            LanguageBox.SelectedIndex = Loc.Language == Loc.Vietnamese ? 0 : 1;
+            _suppressLanguageChange = false;
+
             AccountsList.ItemsSource = DisplayAccounts;
-            
+
             // Check if Master Password has been initialized
             if (!File.Exists(_securityPath))
             {
@@ -55,28 +88,16 @@ namespace AuthenticatorDesktop
             else
             {
                 // Subsequent run: show Unlock Lockscreen
-                SetupPasswordPanel.Visibility = Visibility.Collapsed;
-                UnlockPanel.Visibility = Visibility.Visible;
-                AuthGrid.Visibility = Visibility.Visible;
-                MainAppGrid.Visibility = Visibility.Collapsed;
-                
-                // Focus PasswordBox
-                Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
-                {
-                    TxtMasterPassword.Focus();
-                }));
+                ShowUnlockScreen();
 
-                // Check if Windows Hello is set up
-                if (File.Exists(_biometricPath))
+                // Auto trigger Windows Hello unlock on startup, quietly if it is unavailable
+                if (File.Exists(_helloPath))
                 {
-                    BtnHelloUnlock.Visibility = Visibility.Visible;
-                    ChkWindowsHello.IsChecked = true;
-                    // Auto trigger Windows Hello unlock on startup
-                    Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(TriggerWindowsHelloUnlock));
+                    Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => TriggerWindowsHelloUnlock(silent: true)));
                 }
             }
 
-            // Set up timer (ticks every second to update pins and progress bar)
+            // Set up timer (ticks every second to update pins, progress bar and idle lock)
             _timer = new DispatcherTimer
             {
                 Interval = TimeSpan.FromSeconds(1)
@@ -84,9 +105,156 @@ namespace AuthenticatorDesktop
             _timer.Tick += Timer_Tick;
             _timer.Start();
 
+            _toastTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2.5) };
+            _toastTimer.Tick += (_, _) =>
+            {
+                _toastTimer.Stop();
+                ToastBorder.Visibility = Visibility.Collapsed;
+            };
+
+            // Any input counts as activity for the idle auto-lock.
+            PreviewMouseMove += (_, _) => _lastActivityUtc = DateTime.UtcNow;
+            PreviewKeyDown += (_, _) => _lastActivityUtc = DateTime.UtcNow;
+
+            // Lock the vault when Windows is locked (Win+L, lid close, user switch).
+            SystemEvents.SessionSwitch += OnSessionSwitch;
+            Closed += (_, _) =>
+            {
+                SystemEvents.SessionSwitch -= OnSessionSwitch;
+                SecureClipboard.ClearIfUnchanged();
+                ClearKey();
+            };
+
             // Initial calculations
             UpdatePins();
             UpdateProgressBar();
+        }
+
+        // ==================== DATA LOCATION ====================
+
+        // The install folder is read-only for Microsoft Store (MSIX) and Program Files
+        // installs, so the vault lives in the user's local app data instead.
+        private static string GetDataDirectory()
+        {
+            string dataDir = AppSettings.DataDirectory;
+            Directory.CreateDirectory(dataDir);
+            MigrateLegacyData(dataDir);
+            return dataDir;
+        }
+
+        // Earlier versions kept the vault next to the executable. Copy it over once so
+        // existing users keep their accounts. The originals are left in place.
+        private static void MigrateLegacyData(string dataDir)
+        {
+            if (File.Exists(Path.Combine(dataDir, SecurityFileName))) return;
+
+            string legacyDir = AppDomain.CurrentDomain.BaseDirectory;
+            if (!File.Exists(Path.Combine(legacyDir, SecurityFileName))) return;
+
+            var copied = new List<string>();
+            try
+            {
+                foreach (var name in new[] { SecurityFileName, DataFileName, DeletedFileName })
+                {
+                    string source = Path.Combine(legacyDir, name);
+                    if (!File.Exists(source)) continue;
+
+                    string target = Path.Combine(dataDir, name);
+                    File.Copy(source, target, overwrite: false);
+                    copied.Add(target);
+                }
+            }
+            catch (Exception)
+            {
+                // Roll back a partial copy so the next start retries cleanly
+                // instead of opening a vault with missing files.
+                foreach (var file in copied)
+                {
+                    try { File.Delete(file); } catch { /* Ignore cleanup errors */ }
+                }
+            }
+        }
+
+        // Returns true when an old DPAPI-only Windows Hello key was found and removed.
+        private static bool RemoveLegacyBiometricKey(string dataDir)
+        {
+            string legacyPath = Path.Combine(dataDir, LegacyBiometricFileName);
+            if (!File.Exists(legacyPath)) return false;
+
+            try
+            {
+                File.Delete(legacyPath);
+                return true;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+
+        // ==================== VAULT KEY HANDLING ====================
+
+        // Creates security.dat for a new master password and returns the vault key.
+        private byte[] InitializeVault(string password)
+        {
+            byte[] salt = Crypto.GenerateRandomBytes(Crypto.SaltSize);
+            byte[] key = Crypto.DeriveKey(password, salt);
+            WriteSecurityFile(salt, key);
+            return key;
+        }
+
+        private void WriteSecurityFile(byte[] salt, byte[] key)
+        {
+            byte[] cipherToken = Crypto.Encrypt(AuthToken, key);
+            byte[] securityData = new byte[salt.Length + cipherToken.Length];
+            Array.Copy(salt, 0, securityData, 0, salt.Length);
+            Array.Copy(cipherToken, 0, securityData, salt.Length, cipherToken.Length);
+            AtomicFile.WriteAllBytes(_securityPath, securityData);
+        }
+
+        private static bool IsTokenValid(byte[] securityData, byte[] key)
+        {
+            if (securityData.Length <= Crypto.SaltSize) return false;
+
+            byte[] cipherToken = securityData.AsSpan(Crypto.SaltSize).ToArray();
+            try
+            {
+                byte[] plainToken = Crypto.Decrypt(cipherToken, key);
+                return CryptographicOperations.FixedTimeEquals(plainToken, AuthToken);
+            }
+            catch (CryptographicException)
+            {
+                return false;
+            }
+        }
+
+        // True when key unlocks the vault currently on disk.
+        private bool IsVaultKey(byte[] key)
+        {
+            return File.Exists(_securityPath) && IsTokenValid(File.ReadAllBytes(_securityPath), key);
+        }
+
+        private void ClearKey()
+        {
+            if (_derivedKey != null)
+            {
+                CryptographicOperations.ZeroMemory(_derivedKey);
+                _derivedKey = null;
+            }
+        }
+
+        // A new vault makes any previous Windows Hello key useless; remove it.
+        private void RemoveHelloKey()
+        {
+            try
+            {
+                if (File.Exists(_helloPath)) File.Delete(_helloPath);
+            }
+            catch (Exception) { /* Ignore delete errors */ }
+
+            _ = WindowsHelloKey.DeleteAsync();
+            BtnHelloUnlock.Visibility = Visibility.Collapsed;
+            SetHelloCheckbox(false);
         }
 
         // ==================== ONBOARDING & MASTER PASSWORD FLOW ====================
@@ -101,196 +269,157 @@ namespace AuthenticatorDesktop
             }));
         }
 
-        private void BtnChoiceRestore_Click(object sender, RoutedEventArgs e)
+        private async void BtnChoiceRestore_Click(object sender, RoutedEventArgs e)
         {
             var ofd = new OpenFileDialog
             {
-                Title = "Chọn file sao lưu để khôi phục (Encrypted .ghostbak, JSON hoặc CSV)",
-                Filter = "Tệp sao lưu 2FA (*.ghostbak;*.json;*.csv;*.txt)|*.ghostbak;*.json;*.csv;*.txt|GhostBak Encrypted (*.ghostbak)|*.ghostbak|JSON Backup (*.json)|*.json|CSV/TXT (*.csv;*.txt)|*.csv;*.txt"
+                Title = Loc.T("Restore_DialogTitle"),
+                Filter = Loc.T("Restore_Filter")
             };
 
-            if (ofd.ShowDialog() == true)
+            if (ofd.ShowDialog() != true) return;
+
+            string ext = Path.GetExtension(ofd.FileName).ToLower();
+
+            if (ext == ".ghostbak")
             {
-                string ext = Path.GetExtension(ofd.FileName).ToLower();
+                string? password = PasswordDialog.Prompt(this,
+                    Loc.T("Restore_GhostbakTitle"),
+                    Loc.T("Restore_GhostbakPrompt"));
+                if (password == null) return;
 
-                if (ext == ".ghostbak")
+                try
                 {
-                    string password = Microsoft.VisualBasic.Interaction.InputBox(
-                        "Nhập mật khẩu đã dùng để bảo vệ file sao lưu .ghostbak này:\n(Mật khẩu này cũng sẽ được thiết lập làm Mật Khẩu Chính cho ứng dụng)",
-                        "Khôi Phục Bản Sao Lưu Encrypted .ghostbak",
-                        "");
-
-                    if (string.IsNullOrWhiteSpace(password))
+                    byte[] encryptedBytes = File.ReadAllBytes(ofd.FileName);
+                    string json = await RunBusyAsync(() => Crypto.DecryptGhostBak(encryptedBytes, password));
+                    var imported = JsonSerializer.Deserialize<List<Account>>(json);
+                    if (imported == null || imported.Count == 0)
                     {
-                        MessageBox.Show("Vui lòng nhập mật khẩu để giải mã file sao lưu.", "Hủy khôi phục", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show(Loc.T("Restore_NoAccounts"), Loc.T("Title_DataError"), MessageBoxButton.OK, MessageBoxImage.Error);
                         return;
                     }
 
-                    try
-                    {
-                        byte[] encryptedBytes = File.ReadAllBytes(ofd.FileName);
-                        string json = Crypto.DecryptGhostBak(encryptedBytes, password);
-                        var imported = JsonSerializer.Deserialize<List<Account>>(json);
-                        if (imported == null || imported.Count == 0)
-                        {
-                            MessageBox.Show("File sao lưu không chứa tài khoản hợp lệ nào.", "Lỗi dữ liệu", MessageBoxButton.OK, MessageBoxImage.Error);
-                            return;
-                        }
+                    byte[] key = await RunBusyAsync(() => InitializeVault(password));
+                    EnterNewVault(key, imported);
 
-                        // Initialize security vault with this password
-                        byte[] salt = Crypto.GenerateRandomBytes(16);
-                        byte[] key = Crypto.DeriveKey(password, salt);
-                        byte[] plainToken = Encoding.UTF8.GetBytes("AUTH-OK");
-                        byte[] cipherToken = Crypto.Encrypt(plainToken, key);
-                        byte[] securityData = new byte[salt.Length + cipherToken.Length];
-                        Array.Copy(salt, 0, securityData, 0, salt.Length);
-                        Array.Copy(cipherToken, 0, securityData, salt.Length, cipherToken.Length);
-                        File.WriteAllBytes(_securityPath, securityData);
-
-                        _derivedKey = key;
-                        _allAccounts = imported;
-                        SaveAccounts();
-
-                        // Open App
-                        WelcomeChoicePanel.Visibility = Visibility.Collapsed;
-                        AuthGrid.Visibility = Visibility.Collapsed;
-                        MainAppGrid.Visibility = Visibility.Visible;
-                        UpdateUIList();
-                        UpdatePins();
-
-                        MessageBox.Show($"Khôi phục thành công {imported.Count} tài khoản từ bản sao lưu .ghostbak!\nMật khẩu chính của ứng dụng đã được thiết lập theo mật khẩu file sao lưu.", "Khôi phục hoàn tất", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show("Giải mã file sao lưu thất bại. Mật khẩu không đúng hoặc file bị hư hỏng.\nChi tiết: " + ex.Message, "Lỗi giải mã", MessageBoxButton.OK, MessageBoxImage.Error);
-                    }
+                    MessageBox.Show(Loc.F("Restore_GhostbakDone", imported.Count), Loc.T("Title_RestoreDone"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                else
+                catch (Exception ex) when (ex is CryptographicException || ex is InvalidDataException || ex is JsonException)
                 {
-                    // JSON or CSV File
-                    string password = Microsoft.VisualBasic.Interaction.InputBox(
-                        "Tệp sao lưu này là bản rõ (JSON/CSV). Vui lòng đặt Mật Khẩu Chính (Master Password) mới để bảo vệ ứng dụng:",
-                        "Thiết Lập Mật Khẩu Chính Khôi Phục",
-                        "");
+                    MessageBox.Show(Loc.T("Restore_DecryptFailed"), Loc.T("Title_DecryptError"), MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(Loc.T("Restore_Failed") + ex.Message, Loc.T("Title_RestoreError"), MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            else
+            {
+                // JSON or CSV File
+                string? password = PasswordDialog.Prompt(this,
+                    Loc.T("Restore_PlainTitle"),
+                    Loc.T("Restore_PlainPrompt"),
+                    requireConfirm: true, minLength: 8);
+                if (password == null) return;
 
-                    if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
+                try
+                {
+                    string fileContent = File.ReadAllText(ofd.FileName);
+                    List<Account> importedAccounts = new();
+
+                    if (ext == ".json")
                     {
-                        MessageBox.Show("Mật khẩu chính phải có tối thiểu 8 ký tự.", "Mật khẩu không hợp lệ", MessageBoxButton.OK, MessageBoxImage.Warning);
-                        return;
-                    }
-
-                    try
-                    {
-                        string fileContent = File.ReadAllText(ofd.FileName);
-                        List<Account> importedAccounts = new();
-
-                        if (ext == ".json")
+                        var parsed = JsonSerializer.Deserialize<List<Account>>(fileContent);
+                        if (parsed != null)
                         {
-                            var parsed = JsonSerializer.Deserialize<List<Account>>(fileContent);
-                            if (parsed != null) importedAccounts = parsed;
-                        }
-                        else
-                        {
-                            // CSV/TXT Parsing
                             _allAccounts = new List<Account>();
-                            ImportFromCsvText(fileContent);
+                            ImportAccounts(parsed);
                             importedAccounts = new List<Account>(_allAccounts);
                         }
-
-                        if (importedAccounts.Count == 0)
-                        {
-                            MessageBox.Show("Không tìm thấy dữ liệu tài khoản 2FA hợp lệ nào trong tệp tin.", "Lỗi dữ liệu", MessageBoxButton.OK, MessageBoxImage.Warning);
-                            return;
-                        }
-
-                        // Initialize security vault with this password
-                        byte[] salt = Crypto.GenerateRandomBytes(16);
-                        byte[] key = Crypto.DeriveKey(password, salt);
-                        byte[] plainToken = Encoding.UTF8.GetBytes("AUTH-OK");
-                        byte[] cipherToken = Crypto.Encrypt(plainToken, key);
-                        byte[] securityData = new byte[salt.Length + cipherToken.Length];
-                        Array.Copy(salt, 0, securityData, 0, salt.Length);
-                        Array.Copy(cipherToken, 0, securityData, salt.Length, cipherToken.Length);
-                        File.WriteAllBytes(_securityPath, securityData);
-
-                        _derivedKey = key;
-                        _allAccounts = importedAccounts;
-                        SaveAccounts();
-
-                        // Open App
-                        WelcomeChoicePanel.Visibility = Visibility.Collapsed;
-                        AuthGrid.Visibility = Visibility.Collapsed;
-                        MainAppGrid.Visibility = Visibility.Visible;
-                        UpdateUIList();
-                        UpdatePins();
-
-                        MessageBox.Show($"Khôi phục thành công {importedAccounts.Count} tài khoản 2FA và khởi tạo kho bảo mật thành công!", "Khôi phục hoàn tất", MessageBoxButton.OK, MessageBoxImage.Information);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        MessageBox.Show("Đọc file sao lưu thất bại: " + ex.Message, "Lỗi đọc tệp", MessageBoxButton.OK, MessageBoxImage.Error);
+                        // CSV/TXT Parsing
+                        _allAccounts = new List<Account>();
+                        ImportFromCsvText(fileContent);
+                        importedAccounts = new List<Account>(_allAccounts);
                     }
+
+                    if (importedAccounts.Count == 0)
+                    {
+                        _allAccounts = new List<Account>();
+                        MessageBox.Show(Loc.T("Restore_NoValidData"), Loc.T("Title_DataError"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    byte[] key = await RunBusyAsync(() => InitializeVault(password));
+                    EnterNewVault(key, importedAccounts);
+
+                    MessageBox.Show(Loc.F("Restore_PlainDone", importedAccounts.Count), Loc.T("Title_RestoreDone"), MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    _allAccounts = new List<Account>();
+                    MessageBox.Show(Loc.T("Restore_ReadFailed") + ex.Message, Loc.T("Title_FileReadError"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
 
-        private void BtnSetupPassword_Click(object sender, RoutedEventArgs e)
+        private async void BtnSetupPassword_Click(object sender, RoutedEventArgs e)
         {
             string password = TxtNewPassword.Password;
             string confirm = TxtConfirmPassword.Password;
 
             if (string.IsNullOrEmpty(password) || string.IsNullOrEmpty(confirm))
             {
-                MessageBox.Show("Vui lòng nhập mật khẩu và xác nhận mật khẩu.", "Thiết lập mật khẩu", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.T("Setup_Missing"), Loc.T("Setup_Button"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (password.Length < 8)
             {
-                MessageBox.Show("Mật khẩu chính phải có độ dài tối thiểu 8 ký tự để đảm bảo an toàn.", "Yêu cầu bảo mật", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.T("Setup_TooShort"), Loc.T("Title_SecurityRequirement"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             if (password != confirm)
             {
-                MessageBox.Show("Mật khẩu xác nhận không trùng khớp.", "Mật khẩu không khớp", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.T("Setup_Mismatch"), Loc.T("Title_PasswordMismatch"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             try
             {
-                // Setup US-Standard encryption (PBKDF2 SHA256 + AES256)
-                byte[] salt = Crypto.GenerateRandomBytes(16);
-                byte[] key = Crypto.DeriveKey(password, salt);
+                // Setup US-Standard encryption (PBKDF2 SHA256 + AES-256-GCM)
+                byte[] key = await RunBusyAsync(() => InitializeVault(password));
 
-                byte[] plainToken = Encoding.UTF8.GetBytes("AUTH-OK");
-                byte[] cipherToken = Crypto.Encrypt(plainToken, key);
+                TxtNewPassword.Password = "";
+                TxtConfirmPassword.Password = "";
 
-                byte[] securityData = new byte[salt.Length + cipherToken.Length];
-                Array.Copy(salt, 0, securityData, 0, salt.Length);
-                Array.Copy(cipherToken, 0, securityData, salt.Length, cipherToken.Length);
+                // Initialize empty database and unlock application
+                EnterNewVault(key, new List<Account>());
 
-                File.WriteAllBytes(_securityPath, securityData);
-
-                // Save key in memory
-                _derivedKey = key;
-
-                // Initialize empty database
-                _allAccounts = new List<Account>();
-                SaveAccounts();
-
-                // Unlock application
-                AuthGrid.Visibility = Visibility.Collapsed;
-                MainAppGrid.Visibility = Visibility.Visible;
-                UpdateUIList();
-                UpdatePins();
-
-                MessageBox.Show("Thiết lập mật khẩu Master thành công. Cơ sở dữ liệu của bạn đã được mã hóa bằng AES-256.", "Hoàn tất thiết lập", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowToast(Loc.T("Setup_Done"));
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Có lỗi xảy ra khi thiết lập mật khẩu: " + ex.Message, "Lỗi bảo mật", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(Loc.T("Setup_Failed") + ex.Message, Loc.T("Title_SecurityError"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        // Opens a vault that was just created (new password or restore).
+        private void EnterNewVault(byte[] key, List<Account> accounts)
+        {
+            RemoveHelloKey();
+
+            ClearKey();
+            _derivedKey = key;
+            _allAccounts = accounts;
+            _deletedAccounts = new List<Account>();
+            SaveAccounts();
+            SaveDeletedAccounts();
+
+            ShowMainApp();
         }
 
         private void BtnUnlock_Click(object sender, RoutedEventArgs e)
@@ -346,6 +475,9 @@ namespace AuthenticatorDesktop
                 }
             }
 
+            // Shortcuts only apply while the vault is open
+            if (MainAppGrid.Visibility != Visibility.Visible) return;
+
             // Ctrl shortcuts
             if (Keyboard.Modifiers == ModifierKeys.Control)
             {
@@ -357,94 +489,188 @@ namespace AuthenticatorDesktop
                 }
                 else if (e.Key == Key.N)
                 {
-                    if (MainAppGrid.Visibility == Visibility.Visible)
-                    {
-                        BtnAdd_Click(this, new RoutedEventArgs());
-                        e.Handled = true;
-                    }
+                    BtnAdd_Click(this, new RoutedEventArgs());
+                    e.Handled = true;
                 }
-                else if (e.Key == Key.C)
+                else if (e.Key == Key.L)
+                {
+                    LockApplication();
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.C && Keyboard.FocusedElement is not TextBox)
                 {
                     if (AccountsList.SelectedItem is Account selected)
                     {
-                        CopyOtpToClipboard(selected.Secret);
+                        CopyOtp(selected);
                         e.Handled = true;
                     }
                 }
             }
 
-            // Enter key on selected row in accounts list
-            if (e.Key == Key.Enter && AccountsList.IsFocused)
+            // Enter key on selected row in accounts list (focus is on the row, not the list)
+            if (e.Key == Key.Enter && AccountsList.IsKeyboardFocusWithin)
             {
                 if (AccountsList.SelectedItem is Account selected)
                 {
-                    CopyOtpToClipboard(selected.Secret);
+                    CopyOtp(selected);
                     e.Handled = true;
                 }
             }
         }
 
-        private void UnlockApplication()
+        private async void UnlockApplication()
         {
+            if (_isUnlocking) return;
+
+            if (DateTime.UtcNow < _unlockBlockedUntilUtc)
+            {
+                int seconds = (int)Math.Ceiling((_unlockBlockedUntilUtc - DateTime.UtcNow).TotalSeconds);
+                MessageBox.Show(Loc.F("Unlock_Throttled", seconds), Loc.T("Title_UnlockPaused"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
             string password = TxtMasterPassword.Password;
 
             if (string.IsNullOrEmpty(password))
             {
-                MessageBox.Show("Vui lòng nhập mật khẩu để mở khóa.", "Mở khóa", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.T("Unlock_Empty"), Loc.T("Unlock_Button"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
+            if (!File.Exists(_securityPath))
+            {
+                MessageBox.Show(Loc.T("Unlock_NoSecurityFile"), Loc.T("Title_SystemError"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            byte[] securityData = File.ReadAllBytes(_securityPath);
+            if (securityData.Length <= Crypto.SaltSize)
+            {
+                MessageBox.Show(Loc.T("Unlock_SecurityCorrupt"), Loc.T("Title_FileError"), MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            _isUnlocking = true;
             try
             {
-                if (!File.Exists(_securityPath))
+                byte[] salt = securityData.AsSpan(0, Crypto.SaltSize).ToArray();
+
+                // Derive key using PBKDF2 off the UI thread so the window stays responsive
+                byte[] key = await RunBusyAsync(() => Crypto.DeriveKey(password, salt));
+
+                if (IsTokenValid(securityData, key))
                 {
-                    MessageBox.Show("Không tìm thấy tệp bảo mật. Vui lòng khởi động lại ứng dụng.", "Lỗi hệ thống", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-
-                byte[] securityData = File.ReadAllBytes(_securityPath);
-                if (securityData.Length < 16)
-                {
-                    MessageBox.Show("Tệp bảo mật bị hỏng. Vui lòng xóa tệp security.dat và cài đặt lại mật khẩu.", "Lỗi tệp", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-
-                byte[] salt = new byte[16];
-                Array.Copy(securityData, 0, salt, 0, 16);
-
-                byte[] cipherToken = new byte[securityData.Length - 16];
-                Array.Copy(securityData, 16, cipherToken, 0, cipherToken.Length);
-
-                // Derive key using PBKDF2
-                byte[] key = Crypto.DeriveKey(password, salt);
-
-                // Attempt to decrypt verification token
-                byte[] plainToken = Crypto.Decrypt(cipherToken, key);
-                string token = Encoding.UTF8.GetString(plainToken);
-
-                if (token == "AUTH-OK")
-                {
-                    // Unlock successful
-                    _derivedKey = key;
-                    
-                    // Show Main UI
-                    AuthGrid.Visibility = Visibility.Collapsed;
-                    MainAppGrid.Visibility = Visibility.Visible;
-
-                    // Load database
-                    LoadAccounts();
-                    
                     TxtMasterPassword.Password = "";
+                    _failedUnlockAttempts = 0;
+                    OpenVault(key);
                 }
                 else
                 {
-                    MessageBox.Show("Mật khẩu chính không chính xác. Vui lòng thử lại.", "Mở khóa thất bại", MessageBoxButton.OK, MessageBoxImage.Error);
+                    CryptographicOperations.ZeroMemory(key);
+                    RegisterFailedUnlock();
+                    MessageBox.Show(Loc.T("Unlock_WrongPassword"), Loc.T("Title_UnlockFailed"), MessageBoxButton.OK, MessageBoxImage.Error);
+                    TxtMasterPassword.SelectAll();
+                    TxtMasterPassword.Focus();
                 }
             }
-            catch (Exception)
+            finally
             {
-                MessageBox.Show("Mật khẩu chính không chính xác. Vui lòng thử lại.", "Mở khóa thất bại", MessageBoxButton.OK, MessageBoxImage.Error);
+                _isUnlocking = false;
             }
+        }
+
+        // Slows down repeated guessing: after 5 wrong passwords, wait 30s, then 60s, ... up to 5 minutes.
+        private void RegisterFailedUnlock()
+        {
+            _failedUnlockAttempts++;
+            if (_failedUnlockAttempts < FreeUnlockAttempts) return;
+
+            int extra = Math.Min(_failedUnlockAttempts - FreeUnlockAttempts, 4);
+            int seconds = Math.Min(30 * (1 << extra), 300);
+            _unlockBlockedUntilUtc = DateTime.UtcNow.AddSeconds(seconds);
+        }
+
+        // Opens the existing vault with a verified key.
+        private void OpenVault(byte[] key)
+        {
+            ClearKey();
+            _derivedKey = key;
+
+            ShowMainApp();
+            if (!LoadAccounts()) return;
+            UpgradeStorageFormat();
+
+            if (_helloResetNotice)
+            {
+                _helloResetNotice = false;
+                MessageBox.Show(Loc.T("Hello_Upgraded"), Loc.T("Title_SecurityUpgrade"), MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void ShowMainApp()
+        {
+            WelcomeChoicePanel.Visibility = Visibility.Collapsed;
+            SetupPasswordPanel.Visibility = Visibility.Collapsed;
+            AuthGrid.Visibility = Visibility.Collapsed;
+            MainAppGrid.Visibility = Visibility.Visible;
+            _lastActivityUtc = DateTime.UtcNow;
+            UpdateUIList();
+            UpdatePins();
+        }
+
+        private void ShowUnlockScreen()
+        {
+            WelcomeChoicePanel.Visibility = Visibility.Collapsed;
+            SetupPasswordPanel.Visibility = Visibility.Collapsed;
+            UnlockPanel.Visibility = Visibility.Visible;
+            AuthGrid.Visibility = Visibility.Visible;
+            MainAppGrid.Visibility = Visibility.Collapsed;
+
+            bool helloEnabled = File.Exists(_helloPath);
+            BtnHelloUnlock.Visibility = helloEnabled ? Visibility.Visible : Visibility.Collapsed;
+            SetHelloCheckbox(helloEnabled);
+
+            Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+            {
+                TxtMasterPassword.Focus();
+            }));
+        }
+
+        // ==================== AUTO LOCK ====================
+
+        private void BtnLock_Click(object sender, RoutedEventArgs e)
+        {
+            LockApplication();
+        }
+
+        private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
+        {
+            if (e.Reason == SessionSwitchReason.SessionLock)
+            {
+                Dispatcher.BeginInvoke(new Action(LockApplication));
+            }
+        }
+
+        // Wipes the key and decrypted accounts from memory and returns to the lock screen.
+        private void LockApplication()
+        {
+            if (_derivedKey == null) return;
+
+            SecureClipboard.ClearIfUnchanged();
+            ClearKey();
+
+            _allAccounts = new List<Account>();
+            _deletedAccounts = new List<Account>();
+            DisplayAccounts.Clear();
+            TrashList.ItemsSource = null;
+
+            AddModal.Visibility = Visibility.Collapsed;
+            AboutModal.Visibility = Visibility.Collapsed;
+            BackupImportModal.Visibility = Visibility.Collapsed;
+            InputSecret.Text = "";
+            SearchBox.Text = "";
+
+            ShowUnlockScreen();
         }
 
         // ==================== TOTP LOOP ====================
@@ -453,31 +679,33 @@ namespace AuthenticatorDesktop
         {
             UpdatePins();
             UpdateProgressBar();
+
+            if (_derivedKey != null && DateTime.UtcNow - _lastActivityUtc > IdleLockTimeout)
+            {
+                LockApplication();
+            }
         }
 
         private void UpdatePins()
         {
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-            int remaining = (int)(30 - (now % 30));
 
             foreach (var acc in _allAccounts)
             {
-                acc.RemainingSeconds = remaining;
-
-                string rawPin = Totp.GeneratePin(acc.Secret);
-                if (rawPin == "ERROR")
-                {
-                    acc.FormattedPin = "SAI KHÓA";
-                }
-                else if (rawPin == "------")
-                {
-                    acc.FormattedPin = "--- ---";
-                }
-                else
-                {
-                    acc.FormattedPin = rawPin.Substring(0, 3) + " " + rawPin.Substring(3);
-                }
+                int period = acc.Period > 0 ? acc.Period : Totp.DefaultPeriod;
+                acc.RemainingSeconds = (int)(period - (now % period));
+                acc.FormattedPin = FormatPin(Totp.GeneratePin(acc.Secret, acc.Algorithm, acc.Digits, period));
             }
+        }
+
+        private static string FormatPin(string rawPin)
+        {
+            if (rawPin == "ERROR") return Loc.T("Pin_InvalidKey");
+            if (rawPin == "------") return "--- ---";
+
+            // 6 digits -> "123 456", 8 digits -> "1234 5678"
+            int split = rawPin.Length / 2;
+            return rawPin.Substring(0, split) + " " + rawPin.Substring(split);
         }
 
         private void UpdateProgressBar()
@@ -487,102 +715,115 @@ namespace AuthenticatorDesktop
             TimeProgress.Value = remaining;
         }
 
-        // ==================== STORAGE & SECURITY (AES-256) ====================
+        // ==================== STORAGE & SECURITY (AES-256-GCM) ====================
 
-        private void LoadAccounts()
+        // Returns false when the vault could not be opened safely and the app was locked again.
+        private bool LoadAccounts()
         {
             try
             {
-                if (!File.Exists(_dataPath) || _derivedKey == null)
-                {
-                    UpdateUIList();
-                    return;
-                }
-
-                byte[] encryptedBytes = File.ReadAllBytes(_dataPath);
-                if (encryptedBytes.Length == 0)
-                {
-                    UpdateUIList();
-                    return;
-                }
-
-                // Decrypt using AES-256 with derived key
-                byte[] decryptedBytes = Crypto.Decrypt(encryptedBytes, _derivedKey);
-                string json = Encoding.UTF8.GetString(decryptedBytes);
-                
-                _allAccounts = JsonSerializer.Deserialize<List<Account>>(json) ?? new List<Account>();
-
-                // Load deleted accounts
-                if (File.Exists(_deletedPath))
-                {
-                    byte[] encDeleted = File.ReadAllBytes(_deletedPath);
-                    if (encDeleted.Length > 0)
-                    {
-                        byte[] decDeleted = Crypto.Decrypt(encDeleted, _derivedKey);
-                        string delJson = Encoding.UTF8.GetString(decDeleted);
-                        _deletedAccounts = JsonSerializer.Deserialize<List<Account>>(delJson) ?? new List<Account>();
-                    }
-                }
-                else
-                {
-                    _deletedAccounts = new List<Account>();
-                }
+                _allAccounts = LoadAccountFile(_dataPath, Loc.T("Store_AccountList"));
+                _deletedAccounts = LoadAccountFile(_deletedPath, Loc.T("Store_Trash"));
             }
-            catch (Exception ex)
+            catch (IOException ex)
             {
-                MessageBox.Show("Không thể giải mã cơ sở dữ liệu.\nChi tiết: " + ex.Message, "Lỗi giải mã", MessageBoxButton.OK, MessageBoxImage.Warning);
-                _allAccounts = new List<Account>();
-                _deletedAccounts = new List<Account>();
+                MessageBox.Show(Loc.T("Store_ReadFailed") + ex.Message, Loc.T("Title_StorageError"), MessageBoxButton.OK, MessageBoxImage.Error);
+                LockApplication();
+                return false;
             }
-            
+
             UpdateUIList();
+            UpdatePins();
+            return true;
+        }
+
+        // A file that cannot be decrypted is moved aside instead of being replaced by an
+        // empty list on the next save, so the user can still recover it.
+        private List<Account> LoadAccountFile(string path, string description)
+        {
+            if (_derivedKey == null || !File.Exists(path)) return new List<Account>();
+
+            byte[] encryptedBytes = File.ReadAllBytes(path);
+            if (encryptedBytes.Length == 0) return new List<Account>();
+
+            try
+            {
+                byte[] decryptedBytes = Crypto.Decrypt(encryptedBytes, _derivedKey);
+                return JsonSerializer.Deserialize<List<Account>>(Encoding.UTF8.GetString(decryptedBytes)) ?? new List<Account>();
+            }
+            catch (Exception ex) when (ex is CryptographicException || ex is JsonException)
+            {
+                string keptPath = $"{path}.corrupt-{DateTime.Now:yyyyMMddHHmmss}";
+                File.Move(path, keptPath);
+                MessageBox.Show(Loc.F("Store_Corrupt", description, keptPath), Loc.T("Title_DecryptError"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                return new List<Account>();
+            }
+        }
+
+        // Re-encrypts files written by version 1.0.0 (AES-CBC) with AES-GCM.
+        private void UpgradeStorageFormat()
+        {
+            if (_derivedKey == null) return;
+
+            try
+            {
+                byte[] securityData = File.ReadAllBytes(_securityPath);
+                bool legacy = !Crypto.IsCurrentFormat(securityData.AsSpan(Crypto.SaltSize).ToArray())
+                    || IsLegacyFile(_dataPath)
+                    || IsLegacyFile(_deletedPath);
+                if (!legacy) return;
+
+                SaveAccounts();
+                SaveDeletedAccounts();
+                WriteSecurityFile(securityData.AsSpan(0, Crypto.SaltSize).ToArray(), _derivedKey);
+            }
+            catch (IOException)
+            {
+                // Try again on the next unlock.
+            }
+        }
+
+        private static bool IsLegacyFile(string path)
+        {
+            if (!File.Exists(path)) return false;
+            byte[] data = File.ReadAllBytes(path);
+            return data.Length > 0 && !Crypto.IsCurrentFormat(data);
         }
 
         private void SaveAccounts()
         {
-            try
-            {
-                if (_derivedKey == null) return;
-
-                string json = JsonSerializer.Serialize(_allAccounts);
-                byte[] rawBytes = Encoding.UTF8.GetBytes(json);
-
-                // Encrypt using AES-256 with derived key
-                byte[] encryptedBytes = Crypto.Encrypt(rawBytes, _derivedKey);
-                File.WriteAllBytes(_dataPath, encryptedBytes);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Không thể mã hóa cơ sở dữ liệu.\nLỗi: " + ex.Message, "Lỗi lưu trữ", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            SaveAccountFile(_dataPath, _allAccounts, Loc.T("Store_SaveFailed"));
         }
 
         private void SaveDeletedAccounts()
+        {
+            SaveAccountFile(_deletedPath, _deletedAccounts, Loc.T("Store_SaveTrashFailed"));
+        }
+
+        private void SaveAccountFile(string path, List<Account> accounts, string errorMessage)
         {
             try
             {
                 if (_derivedKey == null) return;
 
-                string json = JsonSerializer.Serialize(_deletedAccounts);
-                byte[] rawBytes = Encoding.UTF8.GetBytes(json);
-
-                // Encrypt using AES-256 with derived key
+                byte[] rawBytes = JsonSerializer.SerializeToUtf8Bytes(accounts);
                 byte[] encryptedBytes = Crypto.Encrypt(rawBytes, _derivedKey);
-                File.WriteAllBytes(_deletedPath, encryptedBytes);
+                CryptographicOperations.ZeroMemory(rawBytes);
+                AtomicFile.WriteAllBytes(path, encryptedBytes);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Không thể mã hóa danh sách đã xóa.\nLỗi: " + ex.Message, "Lỗi lưu trữ", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(errorMessage + Loc.T("Common_ErrorPrefix") + ex.Message, Loc.T("Title_StorageError"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private void UpdateUIList()
         {
             DisplayAccounts.Clear();
-            
+
             var query = SearchBox.Text.Trim().ToLower();
-            var filtered = _allAccounts.Where(acc => 
-                acc.Issuer.ToLower().Contains(query) || 
+            var filtered = _allAccounts.Where(acc =>
+                acc.Issuer.ToLower().Contains(query) ||
                 acc.Label.ToLower().Contains(query)
             );
 
@@ -591,11 +832,50 @@ namespace AuthenticatorDesktop
                 DisplayAccounts.Add(acc);
             }
 
-            // Toggle empty state placeholder
-            EmptyState.Visibility = _allAccounts.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            // Toggle empty state placeholder: no accounts at all vs. no search results
+            if (_allAccounts.Count == 0)
+            {
+                EmptyTitle.Text = Loc.T("Empty_NoAccounts");
+                EmptyHint.Text = Loc.T("Empty_NoAccountsHint");
+                EmptyState.Visibility = Visibility.Visible;
+            }
+            else if (DisplayAccounts.Count == 0)
+            {
+                EmptyTitle.Text = Loc.F("Empty_NoMatch", SearchBox.Text.Trim());
+                EmptyHint.Text = Loc.T("Empty_NoMatchHint");
+                EmptyState.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                EmptyState.Visibility = Visibility.Collapsed;
+            }
         }
 
         // ==================== UI EVENTS & INTERACTION ====================
+
+        private void ShowToast(string message)
+        {
+            ToastText.Text = message;
+            ToastBorder.Visibility = Visibility.Visible;
+            _toastTimer.Stop();
+            _toastTimer.Start();
+        }
+
+        // Runs slow work (PBKDF2) off the UI thread with a wait cursor.
+        private async Task<T> RunBusyAsync<T>(Func<T> work)
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+            IsEnabled = false;
+            try
+            {
+                return await Task.Run(work);
+            }
+            finally
+            {
+                IsEnabled = true;
+                Mouse.OverrideCursor = null;
+            }
+        }
 
         private void BtnAdd_Click(object sender, RoutedEventArgs e)
         {
@@ -608,7 +888,7 @@ namespace AuthenticatorDesktop
 
         private void BtnCloseModal_Click(object sender, RoutedEventArgs e)
         {
-            AddModal.Visibility = Visibility.Collapsed;
+            closeAddModal();
         }
 
         private void ModalBackdrop_Click(object sender, MouseButtonEventArgs e)
@@ -619,6 +899,7 @@ namespace AuthenticatorDesktop
         private void closeAddModal()
         {
             AddModal.Visibility = Visibility.Collapsed;
+            InputSecret.Text = "";
         }
 
         private void BtnAbout_Click(object sender, RoutedEventArgs e)
@@ -644,41 +925,33 @@ namespace AuthenticatorDesktop
 
             if (string.IsNullOrEmpty(issuer) || string.IsNullOrEmpty(label) || string.IsNullOrEmpty(secret))
             {
-                MessageBox.Show("Vui lòng điền đầy đủ tất cả các trường.", "Nhập dữ liệu", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.T("Add_MissingFields"), Loc.T("Title_InputData"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             // Test base32 validity
             try
             {
-                Base32.ToBytes(secret);
+                if (Base32.ToBytes(secret).Length == 0) throw new ArgumentException();
             }
             catch
             {
-                MessageBox.Show("Khóa bí mật Secret Key không hợp lệ (phải là định dạng Base32 chuẩn).", "Lỗi định dạng", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(Loc.T("Add_InvalidSecret"), Loc.T("Title_FormatError"), MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
-            if (_allAccounts.Any(a => a.Secret.Equals(secret, StringComparison.OrdinalIgnoreCase)))
+            if (!AddAccountQuietly(issuer, label, secret))
             {
-                MessageBox.Show("Khóa bí mật này đã tồn tại trong danh sách.", "Trùng lặp", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.T("Add_Duplicate"), Loc.T("Title_Duplicate"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            var newAcc = new Account
-            {
-                Id = Guid.NewGuid().ToString(),
-                Issuer = issuer,
-                Label = label,
-                Secret = secret.ToUpperInvariant()
-            };
-
-            _allAccounts.Add(newAcc);
             SaveAccounts();
             UpdateUIList();
             UpdatePins();
-            
+
             closeAddModal();
+            ShowToast(Loc.F("Add_Done", issuer));
         }
 
         private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -699,7 +972,7 @@ namespace AuthenticatorDesktop
         {
             if (sender is TextBlock tb && tb.DataContext is Account acc)
             {
-                CopyOtpToClipboard(acc.Secret);
+                CopyOtp(acc);
             }
         }
 
@@ -707,21 +980,27 @@ namespace AuthenticatorDesktop
         {
             if (sender is Button btn && btn.Tag is Account acc)
             {
-                CopyOtpToClipboard(acc.Secret);
+                CopyOtp(acc);
             }
         }
 
-        private void CopyOtpToClipboard(string secret)
+        // Copies the current code without a blocking dialog; the clipboard is cleared after 30s.
+        private void CopyOtp(Account acc)
         {
-            string pin = Totp.GeneratePin(secret);
-            if (pin != "ERROR" && pin != "------")
+            string pin = Totp.GeneratePin(acc.Secret, acc.Algorithm, acc.Digits, acc.Period);
+            if (pin == "ERROR" || pin == "------")
             {
-                Clipboard.SetText(pin);
-                
-                // Show custom status dialog or system tray tooltip, simple window message works flatly
-                // To keep it standard Google style, we use a simple temporary window label or just normal messagebox
-                // Let's do a quiet Status notification in Titlebar or just normal Toast simulation:
-                MessageBox.Show("Đã sao chép mã OTP vào clipboard!", "Sao chép thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowToast(Loc.T("Copy_InvalidKey"));
+                return;
+            }
+
+            if (SecureClipboard.SetText(pin, ClipboardClearDelay))
+            {
+                ShowToast(Loc.F("Copy_Done", acc.Issuer));
+            }
+            else
+            {
+                ShowToast(Loc.T("Copy_Busy"));
             }
         }
 
@@ -730,19 +1009,20 @@ namespace AuthenticatorDesktop
         {
             if (sender is Button btn && btn.Tag is Account acc)
             {
-                var result = MessageBox.Show($"Bạn có chắc chắn muốn xóa tài khoản \"{acc.Issuer} ({acc.Label})\" không?\nTài khoản bị xóa sẽ được đưa vào Thùng rác và có thể khôi phục bất cứ lúc nào.", 
-                    "Xác nhận xóa", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                
+                var result = MessageBox.Show(Loc.F("Delete_Confirm", acc.Issuer, acc.Label),
+                    Loc.T("Title_ConfirmDelete"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
                 if (result == MessageBoxResult.Yes)
                 {
-                    _allAccounts.Remove(acc);
-                    SaveAccounts();
-
+                    // Save to the trash first so a crash in between cannot lose the account
                     _deletedAccounts.Add(acc);
                     SaveDeletedAccounts();
 
+                    _allAccounts.Remove(acc);
+                    SaveAccounts();
+
                     UpdateUIList();
-                    MessageBox.Show($"Đã chuyển tài khoản \"{acc.Issuer}\" vào Thùng rác. Bạn có thể khôi phục trong phần Sao lưu & Nhập liệu.", "Xóa thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowToast(Loc.F("Delete_Done", acc.Issuer));
                 }
             }
         }
@@ -751,41 +1031,72 @@ namespace AuthenticatorDesktop
         {
             if (sender is Button btn && btn.Tag is Account acc)
             {
-                try
-                {
-                    if (File.Exists(_biometricPath))
-                    {
-                        var availability = await Windows.Security.Credentials.UI.UserConsentVerifier.CheckAvailabilityAsync();
-                        if (availability == Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
-                        {
-                            var result = await Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync($"Xác thực danh tính để xem khóa bí mật của {acc.Issuer}.");
-                            if (result != Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
-                            {
-                                return;
-                            }
-                        }
-                    }
+                if (!await ConfirmIdentityAsync(Loc.F("Secret_Reason", acc.Issuer))) return;
 
-                    var msgBoxResult = MessageBox.Show($"Khóa bí mật của tài khoản \"{acc.Issuer} ({acc.Label})\" là:\n\n{acc.Secret}\n\nBạn có muốn sao chép khóa này vào bộ nhớ đệm không?", "Xem khóa bí mật", MessageBoxButton.YesNo, MessageBoxImage.Information);
-                    if (msgBoxResult == MessageBoxResult.Yes)
-                    {
-                        Clipboard.SetText(acc.Secret);
-                        MessageBox.Show("Đã sao chép khóa bí mật vào clipboard!", "Sao chép thành công", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-                }
-                catch (Exception ex)
+                var msgBoxResult = MessageBox.Show(Loc.F("Secret_Show", acc.Issuer, acc.Label, acc.Secret), Loc.T("Row_ViewName"), MessageBoxButton.YesNo, MessageBoxImage.Information);
+                if (msgBoxResult == MessageBoxResult.Yes)
                 {
-                    MessageBox.Show("Có lỗi xảy ra: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                    ShowToast(SecureClipboard.SetText(acc.Secret, ClipboardClearDelay)
+                        ? Loc.T("Secret_Copied")
+                        : Loc.T("Copy_Busy"));
                 }
             }
+        }
+
+        // Re-verifies the user before revealing secrets: Windows Hello when enabled,
+        // otherwise (or if Hello is cancelled) the master password.
+        private async Task<bool> ConfirmIdentityAsync(string reason)
+        {
+            if (_derivedKey == null) return false;
+
+            try
+            {
+                if (File.Exists(_helloPath) && await WindowsHelloKey.IsSupportedAsync())
+                {
+                    byte[]? helloKey = await WindowsHelloKey.UnwrapAsync(File.ReadAllBytes(_helloPath));
+                    if (helloKey != null)
+                    {
+                        bool matches = _derivedKey != null && CryptographicOperations.FixedTimeEquals(helloKey, _derivedKey);
+                        CryptographicOperations.ZeroMemory(helloKey);
+                        if (matches) return true;
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Fall back to the master password below.
+            }
+
+            string? password = PasswordDialog.Prompt(this, Loc.T("Verify_Title"), Loc.F("Verify_Prompt", reason));
+            if (password == null || _derivedKey == null) return false;
+
+            byte[] securityData = File.ReadAllBytes(_securityPath);
+            byte[] salt = securityData.AsSpan(0, Crypto.SaltSize).ToArray();
+            byte[] key = await RunBusyAsync(() => Crypto.DeriveKey(password, salt));
+
+            bool ok = _derivedKey != null && CryptographicOperations.FixedTimeEquals(key, _derivedKey);
+            CryptographicOperations.ZeroMemory(key);
+
+            if (!ok)
+            {
+                MessageBox.Show(Loc.T("Verify_WrongPassword"), Loc.T("Title_VerifyFailed"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            return ok;
         }
 
         // ==================== THEME MANAGER ====================
 
         private void BtnTheme_Click(object sender, RoutedEventArgs e)
         {
-            _isDarkMode = !_isDarkMode;
-            
+            ApplyTheme(!_isDarkMode);
+            _settings.DarkMode = _isDarkMode;
+            _settings.Save(_settingsPath);
+        }
+
+        private void ApplyTheme(bool dark)
+        {
+            _isDarkMode = dark;
+
             if (_isDarkMode)
             {
                 // Switch to Dark Theme
@@ -818,6 +1129,23 @@ namespace AuthenticatorDesktop
             }
         }
 
+        // ==================== LANGUAGE ====================
+
+        // Text is loaded when the window is built, so a new language applies after a restart.
+        private void LanguageBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_suppressLanguageChange) return;
+            if (LanguageBox.SelectedItem is not ComboBoxItem item || item.Tag is not string language) return;
+
+            _settings.Language = language;
+            _settings.Save(_settingsPath);
+
+            string message = language == Loc.Vietnamese
+                ? "Khởi động lại ứng dụng để áp dụng ngôn ngữ mới."
+                : "Restart the app to apply the new language.";
+            ShowToast(message);
+        }
+
         // ==================== BACKUP & BULK IMPORT & QR SCANNER ====================
 
         private void BtnBackup_Click(object sender, RoutedEventArgs e)
@@ -846,73 +1174,35 @@ namespace AuthenticatorDesktop
 
         private void SwitchTab(string tabName)
         {
-            // Reset tab styling
-            BtnTabQr.BorderBrush = Brushes.Transparent;
-            BtnTabQr.Foreground = (SolidColorBrush)Resources["TextSecondary"];
-            BtnTabQr.FontWeight = FontWeights.Normal;
-
-            BtnTabJson.BorderBrush = Brushes.Transparent;
-            BtnTabJson.Foreground = (SolidColorBrush)Resources["TextSecondary"];
-            BtnTabJson.FontWeight = FontWeights.Normal;
-
-            BtnTabCsv.BorderBrush = Brushes.Transparent;
-            BtnTabCsv.Foreground = (SolidColorBrush)Resources["TextSecondary"];
-            BtnTabCsv.FontWeight = FontWeights.Normal;
-
-            BtnTabSheet.BorderBrush = Brushes.Transparent;
-            BtnTabSheet.Foreground = (SolidColorBrush)Resources["TextSecondary"];
-            BtnTabSheet.FontWeight = FontWeights.Normal;
-
-            BtnTabTrash.BorderBrush = Brushes.Transparent;
-            BtnTabTrash.Foreground = (SolidColorBrush)Resources["TextSecondary"];
-            BtnTabTrash.FontWeight = FontWeights.Normal;
-
-            // Hide panels
-            PanelTabQr.Visibility = Visibility.Collapsed;
-            PanelTabJson.Visibility = Visibility.Collapsed;
-            PanelTabCsv.Visibility = Visibility.Collapsed;
-            PanelTabSheet.Visibility = Visibility.Collapsed;
-            PanelTabTrash.Visibility = Visibility.Collapsed;
-
-            // Show selected panel
-            if (tabName == "QR")
+            var tabs = new (Button Button, UIElement Panel, string Name)[]
             {
-                BtnTabQr.BorderBrush = (SolidColorBrush)Resources["PrimaryBlue"];
-                BtnTabQr.Foreground = (SolidColorBrush)Resources["TextPrimary"];
-                BtnTabQr.FontWeight = FontWeights.SemiBold;
-                PanelTabQr.Visibility = Visibility.Visible;
-            }
-            else if (tabName == "JSON")
+                (BtnTabQr, PanelTabQr, "QR"),
+                (BtnTabJson, PanelTabJson, "JSON"),
+                (BtnTabCsv, PanelTabCsv, "CSV"),
+                (BtnTabSheet, PanelTabSheet, "SHEET"),
+                (BtnTabTrash, PanelTabTrash, "TRASH"),
+            };
+
+            foreach (var tab in tabs)
             {
-                BtnTabJson.BorderBrush = (SolidColorBrush)Resources["PrimaryBlue"];
-                BtnTabJson.Foreground = (SolidColorBrush)Resources["TextPrimary"];
-                BtnTabJson.FontWeight = FontWeights.SemiBold;
-                PanelTabJson.Visibility = Visibility.Visible;
+                bool selected = tab.Name == tabName;
+                tab.Button.BorderThickness = selected ? new Thickness(0, 0, 0, 2) : new Thickness(0);
+                tab.Button.BorderBrush = selected ? (SolidColorBrush)Resources["PrimaryBlue"] : Brushes.Transparent;
+                tab.Button.Foreground = (SolidColorBrush)Resources[selected ? "TextPrimary" : "TextSecondary"];
+                tab.Button.FontWeight = selected ? FontWeights.SemiBold : FontWeights.Normal;
+                tab.Panel.Visibility = selected ? Visibility.Visible : Visibility.Collapsed;
             }
-            else if (tabName == "CSV")
+
+            if (tabName == "TRASH")
             {
-                BtnTabCsv.BorderBrush = (SolidColorBrush)Resources["PrimaryBlue"];
-                BtnTabCsv.Foreground = (SolidColorBrush)Resources["TextPrimary"];
-                BtnTabCsv.FontWeight = FontWeights.SemiBold;
-                PanelTabCsv.Visibility = Visibility.Visible;
+                RefreshTrashList();
             }
-            else if (tabName == "SHEET")
-            {
-                BtnTabSheet.BorderBrush = (SolidColorBrush)Resources["PrimaryBlue"];
-                BtnTabSheet.Foreground = (SolidColorBrush)Resources["TextPrimary"];
-                BtnTabSheet.FontWeight = FontWeights.SemiBold;
-                PanelTabSheet.Visibility = Visibility.Visible;
-            }
-            else if (tabName == "TRASH")
-            {
-                BtnTabTrash.BorderBrush = (SolidColorBrush)Resources["PrimaryBlue"];
-                BtnTabTrash.Foreground = (SolidColorBrush)Resources["TextPrimary"];
-                BtnTabTrash.FontWeight = FontWeights.SemiBold;
-                PanelTabTrash.Visibility = Visibility.Visible;
-                
-                TrashList.ItemsSource = null;
-                TrashList.ItemsSource = _deletedAccounts;
-            }
+        }
+
+        private void RefreshTrashList()
+        {
+            TrashList.ItemsSource = null;
+            TrashList.ItemsSource = _deletedAccounts;
         }
 
         // ==================== QR CODE SCANNER ENGINE ====================
@@ -934,27 +1224,13 @@ namespace AuthenticatorDesktop
                 if (result != null && !string.IsNullOrWhiteSpace(result.Text))
                 {
                     string uri = result.Text.Trim();
-                    if (ParseAndAddOtpAuthUri(uri))
+                    int idx = uri.IndexOf("otpauth://", StringComparison.OrdinalIgnoreCase);
+                    if (idx >= 0 && ParseAndAddOtpAuthUri(uri.Substring(idx)))
                     {
                         SaveAccounts();
                         UpdateUIList();
                         UpdatePins();
                         return true;
-                    }
-                    else
-                    {
-                        int idx = uri.IndexOf("otpauth://", StringComparison.OrdinalIgnoreCase);
-                        if (idx >= 0)
-                        {
-                            string cleanUri = uri.Substring(idx);
-                            if (ParseAndAddOtpAuthUri(cleanUri))
-                            {
-                                SaveAccounts();
-                                UpdateUIList();
-                                UpdatePins();
-                                return true;
-                            }
-                        }
                     }
                 }
             }
@@ -964,42 +1240,49 @@ namespace AuthenticatorDesktop
 
         private async void BtnScanScreenQr_Click(object sender, RoutedEventArgs e)
         {
+            // SystemParameters are in device-independent units; the capture needs real pixels,
+            // otherwise only part of the screen is scanned on 125%/150% scaling.
+            var dpi = VisualTreeHelper.GetDpi(this);
+            int left = (int)Math.Floor(SystemParameters.VirtualScreenLeft * dpi.DpiScaleX);
+            int top = (int)Math.Floor(SystemParameters.VirtualScreenTop * dpi.DpiScaleY);
+            int width = (int)Math.Ceiling(SystemParameters.VirtualScreenWidth * dpi.DpiScaleX);
+            int height = (int)Math.Ceiling(SystemParameters.VirtualScreenHeight * dpi.DpiScaleY);
+
             this.WindowState = WindowState.Minimized;
-            await System.Threading.Tasks.Task.Delay(350);
+            await Task.Delay(350);
 
             try
             {
-                int screenWidth = (int)SystemParameters.PrimaryScreenWidth;
-                int screenHeight = (int)SystemParameters.PrimaryScreenHeight;
-
-                using (var bmp = new System.Drawing.Bitmap(screenWidth, screenHeight))
+                bool success;
+                using (var bmp = new System.Drawing.Bitmap(width, height))
                 {
                     using (var g = System.Drawing.Graphics.FromImage(bmp))
                     {
-                        g.CopyFromScreen(0, 0, 0, 0, bmp.Size);
+                        g.CopyFromScreen(left, top, 0, 0, bmp.Size);
                     }
 
-                    bool success = ScanBitmapForQrCode(bmp);
+                    success = ScanBitmapForQrCode(bmp);
+                }
 
-                    this.WindowState = WindowState.Normal;
-                    this.Activate();
+                this.WindowState = WindowState.Normal;
+                this.Activate();
 
-                    if (success)
-                    {
-                        MessageBox.Show("Quét mã QR trên màn hình thành công! Tài khoản 2FA mới đã được tự động thêm vào thiết bị.", "Quét QR Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
-                        BackupImportModal.Visibility = Visibility.Collapsed;
-                    }
-                    else
-                    {
-                        MessageBox.Show("Không tìm thấy mã QR 2FA hợp lệ trên màn hình.\nVui lòng đảm bảo mã QR (trên Facebook, Google, Discord...) đang hiển thị rõ trên màn hình máy tính.", "Không tìm thấy QR", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    }
+                if (success)
+                {
+                    BackupImportModal.Visibility = Visibility.Collapsed;
+                    closeAddModal();
+                    ShowToast(Loc.T("Qr_ScanDone"));
+                }
+                else
+                {
+                    MessageBox.Show(Loc.T("Qr_NotFound"), Loc.T("Title_QrNotFound"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
             }
             catch (Exception ex)
             {
                 this.WindowState = WindowState.Normal;
                 this.Activate();
-                MessageBox.Show("Có lỗi xảy ra khi chụp và quét màn hình: " + ex.Message, "Lỗi quét QR", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(Loc.T("Qr_ScanFailed") + ex.Message, Loc.T("Title_QrError"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1007,8 +1290,8 @@ namespace AuthenticatorDesktop
         {
             var ofd = new OpenFileDialog
             {
-                Title = "Chọn file ảnh chứa Mã QR 2FA",
-                Filter = "Tệp hình ảnh (*.png;*.jpg;*.jpeg;*.bmp;*.webp)|*.png;*.jpg;*.jpeg;*.bmp;*.webp"
+                Title = Loc.T("Qr_PickTitle"),
+                Filter = Loc.T("Qr_ImageFilter")
             };
 
             if (ofd.ShowDialog() == true)
@@ -1017,27 +1300,30 @@ namespace AuthenticatorDesktop
                 {
                     using (var bmp = new System.Drawing.Bitmap(ofd.FileName))
                     {
-                        bool success = ScanBitmapForQrCode(bmp);
-                        if (success)
+                        if (ScanBitmapForQrCode(bmp))
                         {
-                            MessageBox.Show("Đọc mã QR từ ảnh thành công! Tài khoản 2FA mới đã được thêm vào thiết bị.", "Thành công", MessageBoxButton.OK, MessageBoxImage.Information);
                             BackupImportModal.Visibility = Visibility.Collapsed;
+                            closeAddModal();
+                            ShowToast(Loc.T("Qr_ImageDone"));
                         }
                         else
                         {
-                            MessageBox.Show("Không thể trích xuất thông tin 2FA từ hình ảnh này.\nVui lòng đảm bảo hình ảnh rõ nét và chứa mã QR chuẩn 2FA (otpauth://).", "Lỗi mã QR", MessageBoxButton.OK, MessageBoxImage.Warning);
+                            MessageBox.Show(Loc.T("Qr_ImageInvalid"), Loc.T("Title_QrCodeError"), MessageBoxButton.OK, MessageBoxImage.Warning);
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Đọc tệp hình ảnh thất bại: " + ex.Message, "Lỗi file", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(Loc.T("Qr_ImageReadFailed") + ex.Message, Loc.T("Title_FileErrorShort"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
 
         private void Window_Drop(object sender, DragEventArgs e)
         {
+            // Dropping files on the lock screen must not touch the vault
+            if (_derivedKey == null) return;
+
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -1065,13 +1351,13 @@ namespace AuthenticatorDesktop
 
                     if (addedCount > 0)
                     {
-                        MessageBox.Show($"Thành công! Đã quét và nhập {addedCount} tài khoản 2FA mới từ hình ảnh kéo thả vào ứng dụng.", "Nhập Kéo & Thả Thành Công", MessageBoxButton.OK, MessageBoxImage.Information);
-                        if (AddModal.Visibility == Visibility.Visible) AddModal.Visibility = Visibility.Collapsed;
+                        if (AddModal.Visibility == Visibility.Visible) closeAddModal();
                         if (BackupImportModal.Visibility == Visibility.Visible) BackupImportModal.Visibility = Visibility.Collapsed;
+                        ShowToast(Loc.F("Drop_Done", addedCount));
                     }
                     else
                     {
-                        MessageBox.Show("Không trích xuất được tài khoản 2FA nào từ hình ảnh đã thả vào ứng dụng.\nVui lòng đảm bảo hình ảnh chứa mã QR chuẩn 2FA (otpauth://).", "Lỗi mã QR", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        MessageBox.Show(Loc.T("Drop_None"), Loc.T("Title_QrCodeError"), MessageBoxButton.OK, MessageBoxImage.Warning);
                     }
                 }
             }
@@ -1081,20 +1367,21 @@ namespace AuthenticatorDesktop
         {
             if (sender is Button btn && btn.Tag is Account acc)
             {
+                // Save the account list first so a crash in between cannot lose the account
+                if (!_allAccounts.Any(a => a.Secret.Equals(acc.Secret, StringComparison.OrdinalIgnoreCase)))
+                {
+                    _allAccounts.Add(acc);
+                    SaveAccounts();
+                }
+
                 _deletedAccounts.Remove(acc);
                 SaveDeletedAccounts();
 
-                _allAccounts.Add(acc);
-                SaveAccounts();
-
                 UpdateUIList();
                 UpdatePins();
+                RefreshTrashList();
 
-                // Refresh ListBox
-                TrashList.ItemsSource = null;
-                TrashList.ItemsSource = _deletedAccounts;
-
-                MessageBox.Show($"Đã khôi phục tài khoản \"{acc.Issuer}\" thành công!", "Khôi phục thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowToast(Loc.F("Trash_Restored", acc.Issuer));
             }
         }
 
@@ -1102,19 +1389,16 @@ namespace AuthenticatorDesktop
         {
             if (sender is Button btn && btn.Tag is Account acc)
             {
-                var result = MessageBox.Show($"Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản \"{acc.Issuer} ({acc.Label})\" không?\nHành động này không thể hoàn tác!", 
-                    "Xác nhận xóa vĩnh viễn", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-                
+                var result = MessageBox.Show(Loc.F("Trash_ConfirmDelete", acc.Issuer, acc.Label),
+                    Loc.T("Title_ConfirmDeleteForever"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
                 if (result == MessageBoxResult.Yes)
                 {
                     _deletedAccounts.Remove(acc);
                     SaveDeletedAccounts();
+                    RefreshTrashList();
 
-                    // Refresh ListBox
-                    TrashList.ItemsSource = null;
-                    TrashList.ItemsSource = _deletedAccounts;
-
-                    MessageBox.Show("Đã xóa tài khoản vĩnh viễn.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowToast(Loc.T("Trash_Deleted"));
                 }
             }
         }
@@ -1123,23 +1407,20 @@ namespace AuthenticatorDesktop
         {
             if (_deletedAccounts.Count == 0)
             {
-                MessageBox.Show("Thùng rác hiện đang trống.", "Thùng rác trống", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowToast(Loc.T("Trash_IsEmpty"));
                 return;
             }
 
-            var result = MessageBox.Show("Bạn có chắc chắn muốn xóa vĩnh viễn toàn bộ tài khoản trong Thùng rác không?\nHành động này không thể hoàn tác!", 
-                "Dọn sạch thùng rác", MessageBoxButton.YesNo, MessageBoxImage.Warning);
-            
+            var result = MessageBox.Show(Loc.T("Trash_ConfirmEmpty"),
+                Loc.T("Title_EmptyTrash"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
             if (result == MessageBoxResult.Yes)
             {
                 _deletedAccounts.Clear();
                 SaveDeletedAccounts();
+                RefreshTrashList();
 
-                // Refresh ListBox
-                TrashList.ItemsSource = null;
-                TrashList.ItemsSource = _deletedAccounts;
-
-                MessageBox.Show("Thùng rác đã được dọn sạch.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                ShowToast(Loc.T("Trash_Emptied"));
             }
         }
 
@@ -1153,24 +1434,19 @@ namespace AuthenticatorDesktop
             ImportBackup();
         }
 
-        private void BtnExportGhostBak_Click(object sender, RoutedEventArgs e)
+        private async void BtnExportGhostBak_Click(object sender, RoutedEventArgs e)
         {
             if (_allAccounts.Count == 0)
             {
-                MessageBox.Show("Không có tài khoản nào để sao lưu.", "Sao lưu", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.T("Backup_NoAccounts"), Loc.T("Tab_Backup"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            string password = Microsoft.VisualBasic.Interaction.InputBox(
-                "Nhập mật khẩu bảo vệ file sao lưu (bạn sẽ cần mật khẩu này để giải mã khi khôi phục):",
-                "Mật Khẩu Sao Lưu Encrypted .ghostbak",
-                "");
-
-            if (string.IsNullOrWhiteSpace(password))
-            {
-                MessageBox.Show("Mật khẩu sao lưu không được để trống.", "Hủy sao lưu", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
+            string? password = PasswordDialog.Prompt(this,
+                Loc.T("Export_PasswordTitle"),
+                Loc.T("Export_PasswordPrompt"),
+                requireConfirm: true, minLength: 8);
+            if (password == null) return;
 
             var sfd = new SaveFileDialog
             {
@@ -1183,74 +1459,57 @@ namespace AuthenticatorDesktop
                 try
                 {
                     string json = JsonSerializer.Serialize(_allAccounts);
-                    byte[] encryptedBytes = Crypto.EncryptGhostBak(json, password);
-                    File.WriteAllBytes(sfd.FileName, encryptedBytes);
-                    MessageBox.Show("Xuất file sao lưu mã hóa (.ghostbak) an toàn thành công!\nFile đã được bảo vệ bằng mật khẩu và có thể lưu trữ trên Cloud/USB mà không lo bị lộ 2FA.", "Sao lưu mã hóa thành công", MessageBoxButton.OK, MessageBoxImage.Information);
+                    byte[] encryptedBytes = await RunBusyAsync(() => Crypto.EncryptGhostBak(json, password));
+                    AtomicFile.WriteAllBytes(sfd.FileName, encryptedBytes);
+                    ShowToast(Loc.T("Export_Done"));
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Có lỗi xảy ra khi tạo file sao lưu: " + ex.Message, "Lỗi sao lưu", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(Loc.T("Export_Failed") + ex.Message, Loc.T("Title_BackupError"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
 
-        private void BtnImportGhostBak_Click(object sender, RoutedEventArgs e)
+        private async void BtnImportGhostBak_Click(object sender, RoutedEventArgs e)
         {
             var ofd = new OpenFileDialog
             {
                 Filter = "Ghost Authenticator Backup (*.ghostbak)|*.ghostbak"
             };
 
-            if (ofd.ShowDialog() == true)
+            if (ofd.ShowDialog() != true) return;
+
+            string? password = PasswordDialog.Prompt(this, Loc.T("Import_PasswordTitle"), Loc.T("Import_PasswordPrompt"));
+            if (password == null) return;
+
+            try
             {
-                string password = Microsoft.VisualBasic.Interaction.InputBox(
-                    "Nhập mật khẩu đã dùng để khóa file sao lưu .ghostbak này:",
-                    "Giải Mã File Sao Lưu",
-                    "");
+                byte[] encryptedBytes = File.ReadAllBytes(ofd.FileName);
+                string json = await RunBusyAsync(() => Crypto.DecryptGhostBak(encryptedBytes, password));
+                var imported = JsonSerializer.Deserialize<List<Account>>(json);
+                if (imported == null) throw new InvalidDataException(Loc.T("Import_NoData"));
 
-                if (string.IsNullOrWhiteSpace(password))
+                int added = ImportAccounts(imported);
+                if (added > 0)
                 {
-                    MessageBox.Show("Vui lòng nhập mật khẩu để giải mã file.", "Hủy mở file", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
+                    SaveAccounts();
+                    UpdateUIList();
+                    UpdatePins();
+                    BackupImportModal.Visibility = Visibility.Collapsed;
+                    ShowToast(Loc.F("Import_GhostbakDone", added));
                 }
-
-                try
+                else
                 {
-                    byte[] encryptedBytes = File.ReadAllBytes(ofd.FileName);
-                    string json = Crypto.DecryptGhostBak(encryptedBytes, password);
-                    var imported = JsonSerializer.Deserialize<List<Account>>(json);
-                    if (imported == null) throw new Exception("File giải mã không chứa dữ liệu tài khoản hợp lệ.");
-
-                    int added = 0;
-                    foreach (var acc in imported)
-                    {
-                        if (!string.IsNullOrEmpty(acc.Issuer) && !string.IsNullOrEmpty(acc.Label) && !string.IsNullOrEmpty(acc.Secret))
-                        {
-                            if (AddAccountQuietly(acc.Issuer, acc.Label, acc.Secret))
-                            {
-                                if (string.IsNullOrEmpty(acc.Id)) acc.Id = Guid.NewGuid().ToString();
-                                added++;
-                            }
-                        }
-                    }
-
-                    if (added > 0)
-                    {
-                        SaveAccounts();
-                        UpdateUIList();
-                        UpdatePins();
-                        MessageBox.Show($"Giải mã và nhập thành công {added} tài khoản 2FA mới từ file sao lưu mã hóa!", "Khôi phục thành công", MessageBoxButton.OK, MessageBoxImage.Information);
-                        BackupImportModal.Visibility = Visibility.Collapsed;
-                    }
-                    else
-                    {
-                        MessageBox.Show("Không tìm thấy tài khoản mới nào hợp lệ (hoặc tất cả tài khoản đã tồn tại).", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
+                    MessageBox.Show(Loc.T("Import_NothingNew"), Loc.T("Title_Info"), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Giải mã file sao lưu thất bại. Mật khẩu không đúng hoặc file đã bị hư hỏng/chỉnh sửa.\nChi tiết: " + ex.Message, "Lỗi giải mã", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
+            }
+            catch (Exception ex) when (ex is CryptographicException || ex is InvalidDataException || ex is JsonException)
+            {
+                MessageBox.Show(Loc.T("Import_DecryptFailed"), Loc.T("Title_DecryptError"), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(Loc.T("Restore_ReadFailed") + ex.Message, Loc.T("Title_FileErrorShort"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1258,9 +1517,13 @@ namespace AuthenticatorDesktop
         {
             if (_allAccounts.Count == 0)
             {
-                MessageBox.Show("Không có tài khoản nào để sao lưu.", "Sao lưu", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.T("Backup_NoAccounts"), Loc.T("Tab_Backup"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            var confirm = MessageBox.Show(Loc.T("Json_ExportWarning"),
+                Loc.T("Title_SecurityWarning"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            if (confirm != MessageBoxResult.Yes) return;
 
             var sfd = new SaveFileDialog
             {
@@ -1274,11 +1537,11 @@ namespace AuthenticatorDesktop
                 {
                     string json = JsonSerializer.Serialize(_allAccounts, new JsonSerializerOptions { WriteIndented = true });
                     File.WriteAllText(sfd.FileName, json);
-                    MessageBox.Show("Xuất file sao lưu thành công!", "Sao lưu JSON", MessageBoxButton.OK, MessageBoxImage.Information);
+                    ShowToast(Loc.T("Json_ExportDone"));
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Có lỗi xảy ra khi ghi file: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(Loc.T("Json_WriteFailed") + ex.Message, Loc.T("Title_Error"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -1296,39 +1559,59 @@ namespace AuthenticatorDesktop
                 {
                     string json = File.ReadAllText(ofd.FileName);
                     var imported = JsonSerializer.Deserialize<List<Account>>(json);
-                    if (imported == null) throw new Exception("File không đúng định dạng.");
+                    if (imported == null) throw new InvalidDataException(Loc.T("Json_InvalidFormat"));
 
-                    int added = 0;
-                    foreach (var acc in imported)
-                    {
-                        if (!string.IsNullOrEmpty(acc.Issuer) && !string.IsNullOrEmpty(acc.Label) && !string.IsNullOrEmpty(acc.Secret))
-                        {
-                            if (AddAccountQuietly(acc.Issuer, acc.Label, acc.Secret))
-                            {
-                                if (string.IsNullOrEmpty(acc.Id)) acc.Id = Guid.NewGuid().ToString();
-                                added++;
-                            }
-                        }
-                    }
-
+                    int added = ImportAccounts(imported);
                     if (added > 0)
                     {
                         SaveAccounts();
                         UpdateUIList();
                         UpdatePins();
-                        MessageBox.Show($"Nhập thành công {added} tài khoản mới vào thiết bị!", "Hoàn tất", MessageBoxButton.OK, MessageBoxImage.Information);
                         BackupImportModal.Visibility = Visibility.Collapsed;
+                        ShowToast(Loc.F("Json_ImportDone", added));
                     }
                     else
                     {
-                        MessageBox.Show("Không tìm thấy tài khoản mới nào hợp lệ để nhập vào (hoặc tất cả đã trùng lặp).", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show(Loc.T("Json_NothingNew"), Loc.T("Title_Info"), MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Nhập sao lưu thất bại. Định dạng file JSON không hợp lệ.\nChi tiết: " + ex.Message, "Lỗi file", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(Loc.T("Json_ImportFailed") + ex.Message, Loc.T("Title_FileErrorShort"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+        }
+
+        // Adds valid, non-duplicate accounts from a backup and returns how many were added.
+        private int ImportAccounts(IEnumerable<Account> imported)
+        {
+            int added = 0;
+            foreach (var acc in imported)
+            {
+                if (string.IsNullOrEmpty(acc.Issuer) || string.IsNullOrEmpty(acc.Label) || string.IsNullOrEmpty(acc.Secret))
+                    continue;
+
+                string? algorithm = Totp.NormalizeAlgorithm(acc.Algorithm);
+                int digits = acc.Digits == 0 ? Totp.DefaultDigits : acc.Digits;
+                int period = acc.Period == 0 ? Totp.DefaultPeriod : acc.Period;
+                if (algorithm == null || digits < 6 || digits > 8 || period <= 0)
+                    continue;
+
+                try
+                {
+                    if (Base32.ToBytes(acc.Secret).Length == 0) continue;
+                }
+                catch
+                {
+                    continue;
+                }
+
+                if (AddAccountQuietly(acc.Issuer, acc.Label, acc.Secret, algorithm, digits, period))
+                {
+                    added++;
+                }
+            }
+            return added;
         }
 
         // CSV/TXT File Bulk Import
@@ -1351,17 +1634,17 @@ namespace AuthenticatorDesktop
                         SaveAccounts();
                         UpdateUIList();
                         UpdatePins();
-                        MessageBox.Show($"Đã nhập thành công hàng loạt {added} tài khoản mới từ tệp tin!", "Nhập hàng loạt thành công", MessageBoxButton.OK, MessageBoxImage.Information);
                         BackupImportModal.Visibility = Visibility.Collapsed;
+                        ShowToast(Loc.F("Csv_ImportDone", added));
                     }
                     else
                     {
-                        MessageBox.Show("Không tìm thấy thông tin tài khoản 2FA hợp lệ mới nào trong tệp tin.", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show(Loc.T("Csv_NothingNew"), Loc.T("Title_Info"), MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show("Đọc tệp tin thất bại. Lỗi: " + ex.Message, "Lỗi đọc tệp", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(Loc.T("Csv_ReadFailed") + ex.Message, Loc.T("Title_FileReadError"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -1372,25 +1655,33 @@ namespace AuthenticatorDesktop
             string url = InputSheetUrl.Text.Trim();
             if (string.IsNullOrEmpty(url))
             {
-                MessageBox.Show("Vui lòng nhập đường dẫn CSV xuất bản của Google Sheet.", "Nhập Google Sheet", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.T("Sheet_UrlMissing"), Loc.T("Title_Sheet"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
-            if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            // Secrets must never travel over plain HTTP
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? sheetUri) || sheetUri.Scheme != Uri.UriSchemeHttps)
             {
-                MessageBox.Show("Đường dẫn liên kết không hợp lệ.", "Nhập Google Sheet", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(Loc.T("Sheet_HttpsOnly"), Loc.T("Title_Sheet"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            var confirm = MessageBox.Show(Loc.T("Sheet_PublicWarning"),
+                Loc.T("Title_SecurityWarning"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            if (confirm != MessageBoxResult.Yes) return;
 
             try
             {
                 using (var client = new System.Net.Http.HttpClient())
                 {
                     client.Timeout = TimeSpan.FromSeconds(10);
-                    var response = await client.GetAsync(url);
+                    client.MaxResponseContentBufferSize = 1024 * 1024;
+                    var response = await client.GetAsync(sheetUri);
                     response.EnsureSuccessStatusCode();
 
                     string csvContent = await response.Content.ReadAsStringAsync();
+                    if (_derivedKey == null) return; // Locked while downloading
+
                     int added = ImportFromCsvText(csvContent);
 
                     if (added > 0)
@@ -1398,19 +1689,19 @@ namespace AuthenticatorDesktop
                         SaveAccounts();
                         UpdateUIList();
                         UpdatePins();
-                        MessageBox.Show($"Đồng bộ thành công! Đã thêm {added} tài khoản mới từ Google Sheet.", "Hoàn tất đồng bộ", MessageBoxButton.OK, MessageBoxImage.Information);
                         InputSheetUrl.Text = "";
                         BackupImportModal.Visibility = Visibility.Collapsed;
+                        MessageBox.Show(Loc.F("Sheet_Done", added), Loc.T("Title_SyncDone"), MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                     else
                     {
-                        MessageBox.Show("Đã tải dữ liệu Google Sheet nhưng không tìm thấy thông tin tài khoản 2FA mới nào (hoặc đã bị trùng lặp).", "Thông báo", MessageBoxButton.OK, MessageBoxImage.Information);
+                        MessageBox.Show(Loc.T("Sheet_NothingNew"), Loc.T("Title_Info"), MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Kết nối và tải dữ liệu từ Google Sheet thất bại.\nChi tiết: " + ex.Message, "Lỗi đồng bộ", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(Loc.T("Sheet_Failed") + ex.Message, Loc.T("Title_SyncError"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
@@ -1440,7 +1731,7 @@ namespace AuthenticatorDesktop
 
                         try
                         {
-                            Base32.ToBytes(secret);
+                            if (Base32.ToBytes(secret).Length == 0) continue;
                             if (AddAccountQuietly(issuer, label, secret)) added++;
                         }
                         catch { /* Skip invalid keys */ }
@@ -1455,7 +1746,7 @@ namespace AuthenticatorDesktop
             try
             {
                 if (!uri.StartsWith("otpauth://totp/", StringComparison.OrdinalIgnoreCase)) return false;
-                
+
                 var uriObj = new Uri(uri);
                 string labelPath = Uri.UnescapeDataString(uriObj.LocalPath).TrimStart('/');
                 string issuer = "";
@@ -1478,12 +1769,21 @@ namespace AuthenticatorDesktop
                 if (!string.IsNullOrEmpty(queryIssuer)) issuer = queryIssuer;
                 if (string.IsNullOrEmpty(issuer)) issuer = "2FA";
 
-                try
-                {
-                    Base32.ToBytes(secret);
-                    return AddAccountQuietly(issuer, label, secret);
-                }
-                catch { return false; }
+                // Honour algorithm/digits/period; ignoring them produces wrong codes silently
+                string algorithmParam = GetQueryParam(query, "algorithm");
+                string? algorithm = Totp.NormalizeAlgorithm(string.IsNullOrEmpty(algorithmParam) ? null : algorithmParam);
+                if (algorithm == null) return false;
+
+                string digitsParam = GetQueryParam(query, "digits");
+                int digits = Totp.DefaultDigits;
+                if (!string.IsNullOrEmpty(digitsParam) && (!int.TryParse(digitsParam, out digits) || digits < 6 || digits > 8)) return false;
+
+                string periodParam = GetQueryParam(query, "period");
+                int period = Totp.DefaultPeriod;
+                if (!string.IsNullOrEmpty(periodParam) && (!int.TryParse(periodParam, out period) || period <= 0 || period > 300)) return false;
+
+                if (Base32.ToBytes(secret).Length == 0) return false;
+                return AddAccountQuietly(issuer, label, secret, algorithm, digits, period);
             }
             catch { return false; }
         }
@@ -1503,9 +1803,10 @@ namespace AuthenticatorDesktop
             return "";
         }
 
-        private bool AddAccountQuietly(string issuer, string label, string secret)
+        private bool AddAccountQuietly(string issuer, string label, string secret,
+            string algorithm = Totp.DefaultAlgorithm, int digits = Totp.DefaultDigits, int period = Totp.DefaultPeriod)
         {
-            secret = secret.ToUpperInvariant();
+            secret = secret.Replace(" ", "").ToUpperInvariant();
             if (_allAccounts.Any(x => x.Secret.Equals(secret, StringComparison.OrdinalIgnoreCase)))
                 return false;
 
@@ -1514,99 +1815,124 @@ namespace AuthenticatorDesktop
                 Id = Guid.NewGuid().ToString(),
                 Issuer = issuer,
                 Label = label,
-                Secret = secret
+                Secret = secret,
+                Algorithm = algorithm,
+                Digits = digits,
+                Period = period
             });
             return true;
         }
 
         // ==================== BIOMETRIC UNLOCK (WINDOWS HELLO) ====================
 
-        private void BtnHelloUnlock_Click(object sender, RoutedEventArgs e)
+        private void SetHelloCheckbox(bool isChecked)
         {
-            TriggerWindowsHelloUnlock();
+            _suppressHelloToggle = true;
+            ChkWindowsHello.IsChecked = isChecked;
+            _suppressHelloToggle = false;
         }
 
-        private async void TriggerWindowsHelloUnlock()
+        private void BtnHelloUnlock_Click(object sender, RoutedEventArgs e)
         {
-            if (!File.Exists(_biometricPath)) return;
+            TriggerWindowsHelloUnlock(silent: false);
+        }
+
+        private async void TriggerWindowsHelloUnlock(bool silent)
+        {
+            if (!File.Exists(_helloPath) || _derivedKey != null) return;
 
             try
             {
-                var availability = await Windows.Security.Credentials.UI.UserConsentVerifier.CheckAvailabilityAsync();
-                if (availability != Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
+                if (!await WindowsHelloKey.IsSupportedAsync())
                 {
-                    MessageBox.Show("Tính năng Windows Hello hiện không khả dụng trên thiết bị này.", "Xác thực thất bại", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    if (!silent)
+                        MessageBox.Show(Loc.T("Hello_Unavailable"), "Windows Hello", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                var result = await Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync("Xác thực nhận diện khuôn mặt hoặc vân tay để mở khóa tài khoản Ghost Authenticator.");
-                if (result == Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
+                byte[]? key = await WindowsHelloKey.UnwrapAsync(File.ReadAllBytes(_helloPath));
+                if (key == null)
                 {
-                    byte[] encryptedKey = File.ReadAllBytes(_biometricPath);
-                    byte[] key = ProtectedData.Unprotect(encryptedKey, null, DataProtectionScope.CurrentUser);
-
-                    _derivedKey = key;
-
-                    // Open App
-                    AuthGrid.Visibility = Visibility.Collapsed;
-                    MainAppGrid.Visibility = Visibility.Visible;
-
-                    LoadAccounts();
+                    if (!silent)
+                        MessageBox.Show(Loc.T("Hello_Failed"), "Windows Hello", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
                 }
+
+                // Unlocked with the password while Hello was showing
+                if (_derivedKey != null)
+                {
+                    CryptographicOperations.ZeroMemory(key);
+                    return;
+                }
+
+                // The vault was re-created since Hello was enabled; this key no longer fits
+                if (!IsVaultKey(key))
+                {
+                    CryptographicOperations.ZeroMemory(key);
+                    RemoveHelloKey();
+                    MessageBox.Show(Loc.T("Hello_Stale"), "Windows Hello", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                _failedUnlockAttempts = 0;
+                OpenVault(key);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Có lỗi xảy ra khi xác thực bằng Windows Hello:\n" + ex.Message, "Lỗi xác thực", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (!silent)
+                    MessageBox.Show(Loc.T("Hello_Error") + ex.Message, Loc.T("Title_AuthError"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         private async void ChkWindowsHello_Checked(object sender, RoutedEventArgs e)
         {
-            if (_derivedKey == null) return;
+            if (_suppressHelloToggle) return;
 
+            if (_derivedKey == null)
+            {
+                SetHelloCheckbox(false);
+                return;
+            }
+
+            byte[] keyCopy = (byte[])_derivedKey.Clone();
             try
             {
-                var availability = await Windows.Security.Credentials.UI.UserConsentVerifier.CheckAvailabilityAsync();
-                if (availability != Windows.Security.Credentials.UI.UserConsentVerifierAvailability.Available)
+                if (!await WindowsHelloKey.IsSupportedAsync())
                 {
-                    MessageBox.Show("Thiết bị của bạn không hỗ trợ hoặc chưa cấu hình Windows Hello (FaceID / Vân tay / PIN).\nVui lòng bật Windows Hello trong Windows Settings.", "Không hỗ trợ", MessageBoxButton.OK, MessageBoxImage.Warning);
-                    ChkWindowsHello.IsChecked = false;
+                    MessageBox.Show(Loc.T("Hello_NotSupported"), Loc.T("Title_NotSupported"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    SetHelloCheckbox(false);
                     return;
                 }
 
-                // Verify user consent first to confirm setup
-                var result = await Windows.Security.Credentials.UI.UserConsentVerifier.RequestVerificationAsync("Xác nhận danh tính để kích hoạt mở khóa bằng Windows Hello.");
-                if (result == Windows.Security.Credentials.UI.UserConsentVerificationResult.Verified)
+                byte[]? blob = await WindowsHelloKey.WrapAsync(keyCopy);
+                if (blob == null || _derivedKey == null)
                 {
-                    // Encrypt derived AES key using DPAPI
-                    byte[] encryptedKey = ProtectedData.Protect(_derivedKey, null, DataProtectionScope.CurrentUser);
-                    File.WriteAllBytes(_biometricPath, encryptedKey);
+                    SetHelloCheckbox(false);
+                    ShowToast(Loc.T("Hello_Cancelled"));
+                    return;
+                }
 
-                    BtnHelloUnlock.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    ChkWindowsHello.IsChecked = false;
-                }
+                AtomicFile.WriteAllBytes(_helloPath, blob);
+                BtnHelloUnlock.Visibility = Visibility.Visible;
+                ShowToast(Loc.T("Hello_Enabled"));
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Lỗi thiết lập Windows Hello: " + ex.Message, "Lỗi", MessageBoxButton.OK, MessageBoxImage.Error);
-                ChkWindowsHello.IsChecked = false;
+                MessageBox.Show(Loc.T("Hello_SetupFailed") + ex.Message, Loc.T("Title_Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+                SetHelloCheckbox(false);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(keyCopy);
             }
         }
 
         private void ChkWindowsHello_Unchecked(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                if (File.Exists(_biometricPath))
-                {
-                    File.Delete(_biometricPath);
-                }
-                BtnHelloUnlock.Visibility = Visibility.Collapsed;
-            }
-            catch { /* Ignore delete errors */ }
+            if (_suppressHelloToggle) return;
+
+            RemoveHelloKey();
+            ShowToast(Loc.T("Hello_Disabled"));
         }
     }
 
@@ -1619,7 +1945,13 @@ namespace AuthenticatorDesktop
         public string Label { get; set; } = string.Empty;
         public string Secret { get; set; } = string.Empty;
 
+        // otpauth parameters; defaults match accounts saved by version 1.0.0
+        public string Algorithm { get; set; } = Totp.DefaultAlgorithm;
+        public int Digits { get; set; } = Totp.DefaultDigits;
+        public int Period { get; set; } = Totp.DefaultPeriod;
+
         private string _formattedPin = "------";
+        [System.Text.Json.Serialization.JsonIgnore]
         public string FormattedPin
         {
             get => _formattedPin;
@@ -1633,6 +1965,7 @@ namespace AuthenticatorDesktop
             }
         }
         private int _remainingSeconds = 30;
+        [System.Text.Json.Serialization.JsonIgnore]
         public int RemainingSeconds
         {
             get => _remainingSeconds;
@@ -1647,8 +1980,10 @@ namespace AuthenticatorDesktop
             }
         }
 
+        [System.Text.Json.Serialization.JsonIgnore]
         public string RemainingSecondsText => $"{RemainingSeconds}s";
 
+        [System.Text.Json.Serialization.JsonIgnore]
         public string IssuerAbbr
         {
             get
